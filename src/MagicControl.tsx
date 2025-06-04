@@ -8,6 +8,7 @@ import {
 } from '@mediapipe/tasks-vision';
 
 import { EMASmoother } from './components/EMASmoother.ts';
+import { calculateDistance } from './utils/geometry';
 import type { MapRef } from 'react-map-gl/maplibre';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
@@ -72,18 +73,6 @@ function MagicControl() {
   const handleMapLoad = useCallback(() => {
     setGestureStatus('Map Loaded. Initializing MediaPipe...');
   }, []);
-
-  const calculateDistance = useCallback(
-    (p1?: NormalizedLandmark, p2?: NormalizedLandmark): number => {
-      if (!p1 || !p2) return Infinity;
-      return Math.sqrt(
-        Math.pow(p1.x - p2.x, 2) +
-          Math.pow(p1.y - p2.y, 2) +
-          Math.pow(p1.z! - p2.z!, 2),
-      );
-    },
-    [],
-  );
 
   const getScreenCoordinatesForMap = useCallback(
     (normalizedLandmark: NormalizedLandmark): [number, number] | null => {
