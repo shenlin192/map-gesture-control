@@ -1,18 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   DrawingUtils,
-  FilesetResolver,
   GestureRecognizer,
-  type NormalizedLandmark,
 } from '@mediapipe/tasks-vision';
 
 import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
 import type { MapRef } from 'react-map-gl/mapbox';
+import { useMediaPipe } from './hooks/useMediaPipe';
 
-const MEDIAPIPE_GESTURE_MODEL_PATH: string =
-  'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
+const MAX_SUPPORTED_HANDS = 2; // Max number of hands MediaPipe is configured for
 
 /**
  * Main component for hand gesture control of the map
@@ -23,15 +21,13 @@ function MagicControl() {
   const mapRef = useRef<MapRef | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gestureRecognizerRef = useRef<GestureRecognizer | null>(null);
-  const drawingUtilsRef = useRef<DrawingUtils | null>(null);
   const requestRef = useRef<number | null>(null);
 
-  // State
-  const [gestureRecognizerLoaded, setGestureRecognizerLoaded] = useState<boolean>(false);
+  // Use the custom hook for MediaPipe initialization
+  const { gestureRecognizerRef, drawingUtilsRef, isMediaPipeLoaded } = useMediaPipe({ canvasRef });
 
   // Gesture tracking refs
-  const landmarkSmootherRef = useRef<EMASmoother[]>([]);
+  const landmarkSmootherRef = useRef<EMASmoother[][]>([]); // Array of arrays for multi-hand smoothing
 
   /**
    * Handles successful map load
@@ -40,35 +36,87 @@ function MagicControl() {
     console.log('Map loaded successfully.');
   }, []);
 
-  /**
-   * Initializes MediaPipe hand gesture recognition
-   */
-  const initializeMediaPipe = useCallback(async () => {
-    console.log('Initializing MediaPipe...');
-    try {
-      const vision = await FilesetResolver.forVisionTasks(
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm',
-      );
-      gestureRecognizerRef.current = await GestureRecognizer.createFromOptions(
-        vision,
-        {
-          baseOptions: {
-            modelAssetPath: MEDIAPIPE_GESTURE_MODEL_PATH,
-            delegate: 'GPU',
-          },
-          runningMode: 'VIDEO',
-          numHands: 2,
-        },
-      );
-      drawingUtilsRef.current = new DrawingUtils(
-        canvasRef.current?.getContext('2d') as CanvasRenderingContext2D,
-      );
-      console.log('MediaPipe Initialized.');
-      setGestureRecognizerLoaded(true);
-    } catch (error) {
-      console.error('Failed to initialize MediaPipe:', error);
+
+  const predictWebcamLoop = useCallback(() => {
+    if (
+      !gestureRecognizerRef.current ||
+      !drawingUtilsRef.current ||
+      !videoRef.current?.currentTime ||
+      !canvasRef.current
+    ) {
+      requestRef.current = requestAnimationFrame(predictWebcamLoop);
+      return;
     }
-  }, [setGestureRecognizerLoaded]);
+
+    const canvasCtx = canvasRef.current?.getContext('2d');
+    if (!canvasCtx) {
+      requestRef.current = requestAnimationFrame(predictWebcamLoop);
+      return;
+    }
+
+    try {
+      const startTimeMs = performance.now();
+      const results = gestureRecognizerRef.current?.recognizeForVideo(
+        videoRef.current,
+        startTimeMs,
+      );
+
+      canvasCtx.save();
+      canvasCtx.clearRect(
+        0,
+        0,
+        canvasRef.current.width,
+        canvasRef.current.height,
+      );
+
+      if (
+        videoRef.current.videoWidth > 0 &&
+        videoRef.current.videoHeight > 0 &&
+        (canvasRef.current.width !== videoRef.current.videoWidth ||
+          canvasRef.current.height !== videoRef.current.videoHeight)
+      ) {
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+      }
+
+      if (results?.landmarks?.length > 0 && landmarkSmootherRef.current.length > 0) {
+        const allHandsSmoothed = results.landmarks.map((handLandmarks, handIndex) => {
+          if (handIndex >= MAX_SUPPORTED_HANDS) {
+            return handLandmarks; // Safety: Should not exceed configured numHands
+          }
+          const handSpecificSmoothers = landmarkSmootherRef.current[handIndex];
+          if (!handSpecificSmoothers) {
+            return handLandmarks; // Safety: Smoother array for this hand doesn't exist
+          }
+          return handLandmarks.map((lm, landmarkIdx) =>
+            handSpecificSmoothers[landmarkIdx]?.smoothLandmark(lm) || lm,
+          );
+        });
+
+        allHandsSmoothed.forEach((singleHandSmoothedLandmarks) => {
+          drawingUtilsRef.current!.drawConnectors(
+            singleHandSmoothedLandmarks,
+            GestureRecognizer.HAND_CONNECTIONS,
+            { color: '#FFFFFF', lineWidth: 3 }, // White connectors
+          );
+          drawingUtilsRef.current!.drawLandmarks(singleHandSmoothedLandmarks, {
+            color: '#FF9800', // Orange landmarks
+            fillColor: '#FF9800',
+            lineWidth: 1,
+            radius: (data: any) => {
+              // Adjust landmark size based on Z-depth
+              return DrawingUtils.lerp(data.from!.z!, -0.15, 0.1, 5, 1);
+            },
+          });
+        });
+      }
+      canvasCtx.restore();
+    } catch (err) {
+      console.error('Error in prediction loop:', err);
+    }
+
+    requestRef.current = requestAnimationFrame(predictWebcamLoop);
+  }, [mapRef, videoRef, canvasRef, gestureRecognizerRef, drawingUtilsRef, landmarkSmootherRef]);
 
   /**
    * Sets up the webcam stream and starts the prediction loop
@@ -93,9 +141,13 @@ function MagicControl() {
             canvasRef.current.height = videoRef.current.videoHeight;
           }
 
-          landmarkSmootherRef.current = Array(21)
+          // Initialize smoothers for each potential hand and each landmark
+          landmarkSmootherRef.current = Array(MAX_SUPPORTED_HANDS)
             .fill(null)
-            // .map(() => new EMASmoother(0.2, 0.2, 0.2, 10));
+            .map(() => // For each hand
+              Array(21).fill(null)
+              .map(() => new EMASmoother(0.5)),
+            );
 
           console.log('Webcam ready. Starting prediction loop...');
           requestRef.current = requestAnimationFrame(predictWebcamLoop);
@@ -107,95 +159,17 @@ function MagicControl() {
     } catch (error) {
       console.error('Error setting up webcam:', error);
     }
-  }, [videoRef, canvasRef, landmarkSmootherRef]);
-
-  const predictWebcamLoop = useCallback(() => {
-    if (
-      !gestureRecognizerRef.current ||
-      !videoRef.current ||
-      videoRef.current.readyState < HTMLMediaElement.HAVE_METADATA
-    ) {
-      requestRef.current = requestAnimationFrame(predictWebcamLoop);
-      return;
-    }
-
-    const mapInstance = mapRef.current?.getMap();
-    if (!mapInstance) {
-      requestRef.current = requestAnimationFrame(predictWebcamLoop);
-      return;
-    }
-
-    try {
-      const startTimeMs = performance.now();
-      const results = gestureRecognizerRef.current?.recognizeForVideo(
-        videoRef.current,
-        startTimeMs,
-      );
-
-      const canvasCtx = canvasRef.current?.getContext('2d');
-
-      if (canvasCtx && canvasRef.current && videoRef.current) {
-        canvasCtx.save();
-        canvasCtx.clearRect(
-          0,
-          0,
-          canvasRef.current.width,
-          canvasRef.current.height,
-        );
-
-        if (
-          videoRef.current.videoWidth > 0 &&
-          videoRef.current.videoHeight > 0 &&
-          (canvasRef.current.width !== videoRef.current.videoWidth ||
-            canvasRef.current.height !== videoRef.current.videoHeight)
-        ) {
-          canvasRef.current.width = videoRef.current.videoWidth;
-          canvasRef.current.height = videoRef.current.videoHeight;
-        }
-
-        if (results?.landmarks?.length > 0) {
-          const allHands = results.landmarks.map((handLandmarks) =>
-            handLandmarks.map(
-              (lm, idx) =>
-                landmarkSmootherRef.current[idx]?.smoothLandmark(lm) || lm,
-            ),
-          );
-
-          if (drawingUtilsRef.current) {
-            allHands.forEach((handLandmarks) => {
-              drawingUtilsRef.current.drawConnectors(
-                handLandmarks,
-                GestureRecognizer.HAND_CONNECTIONS,
-                { color: '#00FF00', lineWidth: 2 },
-              );
-              drawingUtilsRef.current.drawLandmarks(handLandmarks, {
-                color: '#FF0000',
-                lineWidth: 1,
-                radius: 3,
-              });
-            });
-          }
-        }
-        canvasCtx.restore();
-      }
-    } catch (err) {
-      console.error('Error in prediction loop:', err);
-    }
-
-    requestRef.current = requestAnimationFrame(predictWebcamLoop);
-  }, [mapRef, videoRef, canvasRef, gestureRecognizerRef, drawingUtilsRef, landmarkSmootherRef]);
+  }, [videoRef, canvasRef, landmarkSmootherRef, predictWebcamLoop]);
 
   useEffect(() => {
-    initializeMediaPipe();
-
-    if (!gestureRecognizerLoaded) {
+    if (!isMediaPipeLoaded) {
       console.log(
-        'useEffect: gesture recognizer not loaded yet, skipping webcam setup.',
+        'useEffect: MediaPipe not loaded yet, skipping webcam setup.',
       );
       return;
     }
 
-    console.log('useEffect: Webcam setup initiated as gesture recognizer is loaded.');
+    console.log('useEffect: Webcam setup initiated as MediaPipe is loaded.');
     setupWebcam().catch(console.error);
 
     return () => {
@@ -207,7 +181,7 @@ function MagicControl() {
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [gestureRecognizerLoaded, initializeMediaPipe, setupWebcam]);
+  }, [isMediaPipeLoaded, setupWebcam]);
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">

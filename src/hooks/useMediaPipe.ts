@@ -1,71 +1,71 @@
-import { useState, useEffect, useRef } from 'react';
-import { GestureRecognizer, FilesetResolver } from '@mediapipe/tasks-vision';
-import { EMASmoother } from '../components/EMASmoother';
-import type { GestureStatus } from '../types';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import {
+  GestureRecognizer,
+  FilesetResolver,
+  DrawingUtils,
+} from '@mediapipe/tasks-vision';
 
-const MEDIAPIPE_GESTURE_MODEL_PATH =
+const MEDIAPIPE_GESTURE_MODEL_PATH: string =
   'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
 
-interface UseMediaPipeOptions {
-  initialStatus: GestureStatus;
-  setGestureStatus: (status: GestureStatus) => void;
+interface UseMediaPipeProps {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
 }
 
-export const useMediaPipe = ({
-  initialStatus,
-  setGestureStatus,
-}: UseMediaPipeOptions) => {
+export function useMediaPipe({ canvasRef }: UseMediaPipeProps) {
   const gestureRecognizerRef = useRef<GestureRecognizer | null>(null);
-  const landmarkSmootherRef = useRef<EMASmoother[]>([]);
-  const [isMediaPipeLoaded, setIsMediaPipeLoaded] = useState(false);
+  const drawingUtilsRef = useRef<DrawingUtils | null>(null);
+  const [isMediaPipeLoaded, setIsMediaPipeLoaded] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (
-      isMediaPipeLoaded ||
-      gestureRecognizerRef.current ||
-      initialStatus !== 'Map Loaded. Initializing MediaPipe...'
-    ) {
-      return;
-    }
-
-    const initializeMediaPipe = async () => {
-      try {
-        console.log('Initializing MediaPipe (from hook)...');
-        const vision = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm',
-        );
-
-        const recognizer = await GestureRecognizer.createFromOptions(vision, {
+  const initializeMediaPipe = useCallback(async () => {
+    console.log('Initializing MediaPipe (from hook)...');
+    try {
+      const vision = await FilesetResolver.forVisionTasks(
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm',
+      );
+      gestureRecognizerRef.current = await GestureRecognizer.createFromOptions(
+        vision,
+        {
           baseOptions: {
             modelAssetPath: MEDIAPIPE_GESTURE_MODEL_PATH,
             delegate: 'GPU',
           },
           runningMode: 'VIDEO',
           numHands: 2,
-          minHandDetectionConfidence: 0.6,
-          minHandPresenceConfidence: 0.6,
-          minTrackingConfidence: 0.6,
-        });
+        },
+      );
 
-        console.log('MediaPipe initialized successfully (from hook)');
-        gestureRecognizerRef.current = recognizer;
-        landmarkSmootherRef.current = Array(21)
-          .fill(null)
-          .map(() => new EMASmoother(0.4));
-        setIsMediaPipeLoaded(true);
-        setGestureStatus('MediaPipe Ready. Starting Webcam...');
-      } catch (err) {
-        const errorMessage =
-          'Error initializing MediaPipe (from hook): ' +
-          (err instanceof Error ? err.message : 'Unknown error');
-        console.error(errorMessage, err);
-        setGestureStatus('Error initializing MediaPipe. Check console.');
-        setIsMediaPipeLoaded(false);
+      if (canvasRef.current) {
+        const canvasCtx = canvasRef.current.getContext('2d');
+        if (canvasCtx) {
+          drawingUtilsRef.current = new DrawingUtils(canvasCtx);
+          console.log('useMediaPipe: DrawingUtils initialized.');
+        } else {
+          console.error(
+            'useMediaPipe: Failed to get 2D context from canvas for DrawingUtils.',
+          );
+        }
+      } else {
+        console.warn(
+          'useMediaPipe: canvasRef.current is null during init. DrawingUtils may not be initialized yet.',
+        );
       }
-    };
 
+      console.log('MediaPipe Initialized (from hook).');
+      setIsMediaPipeLoaded(true);
+    } catch (error) {
+      console.error('Failed to initialize MediaPipe (from hook):', error);
+      setIsMediaPipeLoaded(false); // Ensure state reflects failure
+    }
+  }, [canvasRef, setIsMediaPipeLoaded]);
+
+  useEffect(() => {
     initializeMediaPipe();
-  }, [initialStatus, setGestureStatus, isMediaPipeLoaded]);
+  }, [initializeMediaPipe]);
 
-  return { gestureRecognizerRef, landmarkSmootherRef, isMediaPipeLoaded };
-};
+  return {
+    gestureRecognizerRef,
+    drawingUtilsRef,
+    isMediaPipeLoaded,
+  };
+}
