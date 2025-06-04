@@ -12,30 +12,11 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
 import StatusDisplay from './components/Status.tsx';
+import type { ControlMode, GestureStatus, GestureType } from './types.ts';
 
 const MEDIAPIPE_GESTURE_MODEL_PATH: string =
   'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
 
-// Types for better type safety
-type GestureType =
-  | 'NONE'
-  | 'PINCHING'
-  | 'PANNING_POINTING_UP'
-  | 'PANNING_CUSTOM';
-type ControlMode = 'PAN' | 'ZOOM';
-type GestureStatus =
-  | 'Initializing Map...'
-  | 'Map Loaded. Initializing MediaPipe...'
-  | 'MediaPipe Ready. Starting Webcam...'
-  | 'Starting Webcam...'
-  | 'Webcam Active. Waiting for gestures...'
-  | 'Webcam Active. No hand detected.'
-  | `Webcam Active. Detected: ${string}`
-  | `Pinch Detected (Dist: ${string})`
-  | 'Panning (Pointing Up)'
-  | 'Panning (Custom Point)'
-  | 'Error initializing MediaPipe. Check console.'
-  | 'Error accessing webcam. Check permissions.';
 
 /**
  * Main component for hand gesture control of the map
