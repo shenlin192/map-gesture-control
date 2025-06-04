@@ -15,8 +15,6 @@ export const calculateDistance = (
   const z1 = p1.z ?? 0;
   const z2 = p2.z ?? 0;
   return Math.sqrt(
-    Math.pow(p1.x - p2.x, 2) +
-    Math.pow(p1.y - p2.y, 2) +
-    Math.pow(z1 - z2, 2),
+    Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow(z1 - z2, 2),
   );
 };

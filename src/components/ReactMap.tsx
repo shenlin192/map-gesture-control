@@ -2,7 +2,6 @@ import { type Ref } from 'react';
 import Map, { type MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-
 type Props = {
   mapRef: Ref<MapRef>;
   containerRef: Ref<HTMLDivElement>;

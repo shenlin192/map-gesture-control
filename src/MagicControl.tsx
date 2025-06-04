@@ -9,11 +9,12 @@ import {
 
 import { EMASmoother } from './components/EMASmoother.ts';
 import { calculateDistance } from './utils/geometry';
-import type { MapRef } from 'react-map-gl/maplibre';
+import { isIndexPointingCustom } from './utils/gestureUtils';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
 import StatusDisplay from './components/Status.tsx';
 import type { ControlMode, GestureStatus, GestureType } from './types.ts';
+import type { MapRef } from 'react-map-gl/mapbox';
 
 const MEDIAPIPE_GESTURE_MODEL_PATH: string =
   'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task';
@@ -86,40 +87,7 @@ function MagicControl() {
     [],
   );
 
-  const isIndexPointingCustom = useCallback(
-    (landmarks: NormalizedLandmark[]): boolean => {
-      if (!landmarks || landmarks.length === 0) return false;
-      const hand = landmarks;
-      const idxT = hand[8],
-        idxP = hand[6],
-        idxM = hand[5];
-      const midT = hand[12],
-        midP = hand[10];
-      const rngT = hand[16],
-        rngP = hand[14];
-      const pkyT = hand[20],
-        pkyP = hand[18];
-      if (
-        !idxT ||
-        !idxP ||
-        !idxM ||
-        !midT ||
-        !midP ||
-        !rngT ||
-        !rngP ||
-        !pkyT ||
-        !pkyP
-      )
-        return false;
-      const indexExtended = idxT.y < idxP.y && idxP.y < idxM.y;
-      const yTol = 0.04;
-      const middleCurled = midT.y > midP.y - yTol;
-      const ringCurled = rngT.y > rngP.y - yTol;
-      const pinkyCurled = pkyT.y > pkyP.y - yTol;
-      return indexExtended && middleCurled && ringCurled && pinkyCurled;
-    },
-    [],
-  );
+
 
   const processGestures = useCallback(
     (
@@ -532,7 +500,7 @@ function MagicControl() {
 
       // Update gesture status for debugging
       setGestureStatus(
-        `Zoom: ${newZoom.toFixed(2)} (${zoomDelta > 0 ? '+' : ''}${zoomDelta.toFixed(3)})`,
+        `Zoom: ${newZoom.toFixed(2)} (${zoomDelta > 0 ? '+' : ''}${zoomDelta.toFixed(3)})` as GestureStatus,
       );
 
       return true;
@@ -542,6 +510,7 @@ function MagicControl() {
     }
   };
 
+  // i don't know what this is for
   const applyMomentum = useCallback(() => {
     if (!flickMomentumRef.current) return false;
 
