@@ -1,6 +1,7 @@
 import { type Ref } from 'react';
-import Map, { type MapRef } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
+import Map, { type MapRef } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
 
 type Props = {
   mapRef: Ref<MapRef>;
@@ -12,7 +13,7 @@ function ReactMap({ mapRef, containerRef, onMapLoad }: Props) {
   return (
     <div
       ref={containerRef}
-      className="w-full h-[400px] md:h-[600px] rounded-lg shadow-xl border-2 border-blue-500 bg-gray-700 relative overflow-hidden"
+      className="w-full h-full rounded-lg shadow-xl border-2 border-blue-500 bg-gray-700 relative overflow-hidden"
     >
       <Map
         ref={mapRef}
@@ -22,6 +23,7 @@ function ReactMap({ mapRef, containerRef, onMapLoad }: Props) {
           latitude: 40,
           zoom: 9,
         }}
+        mapboxAccessToken={import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}
         style={{ height: '100%' }}
         mapStyle="mapbox://styles/mapbox/streets-v12"
       ></Map>
