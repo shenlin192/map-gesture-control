@@ -9,7 +9,7 @@ export function useMediaPipe() {
   const [isMediaPipeLoaded, setIsMediaPipeLoaded] = useState<boolean>(false);
 
   const initializeMediaPipe = useCallback(async () => {
-    console.log('Initializing MediaPipe (from hook)...');
+    console.log('Initializing MediaPipe');
     try {
       const vision = await FilesetResolver.forVisionTasks(
         'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm',
@@ -26,8 +26,9 @@ export function useMediaPipe() {
         },
       );
       setIsMediaPipeLoaded(true);
+      console.log('MediaPipe initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize MediaPipe (from hook):', error);
+      console.error('Failed to initialize MediaPipe:', error);
       setIsMediaPipeLoaded(false);
     }
   }, [setIsMediaPipeLoaded]);

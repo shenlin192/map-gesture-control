@@ -7,17 +7,12 @@ import { useMediaPipe } from './hooks/useMediaPipe';
 import { useCanvasSetup } from './hooks/useCanvasSetup';
 import {
   initializeEmaSmoothersForHands,
-  getSmoothedLandmarksForFrame,
-  drawHandsOnCanvas,
+  processFrameAndDrawHands,
 } from './utils/handTrackingUtils';
 
-const MAX_SUPPORTED_HANDS = 2; // Max number of hands MediaPipe is configured for
+const MAX_SUPPORTED_HANDS = 2;
 
-/**
- * Main component for hand gesture control of the map
- */
 function MagicControl() {
-  // Refs
   const mapComponentContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapRef | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -26,7 +21,7 @@ function MagicControl() {
   const landmarkSmootherRef = useRef<EMASmoother[][]>([]);
 
   const { gestureRecognizerRef, isMediaPipeLoaded } = useMediaPipe();
-  const { drawingUtilsRef } = useCanvasSetup({ canvasRef, isMediaPipeLoaded });
+  const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isMediaPipeLoaded });
 
   const handleMapLoad = useCallback(() => {
     console.log('Map loaded successfully.');
@@ -34,62 +29,24 @@ function MagicControl() {
 
   const predictWebcamLoop: () => void = useCallback(() => {
     if (
-      !gestureRecognizerRef.current ||
-      !drawingUtilsRef.current ||
       !videoRef.current ||
-      videoRef.current.readyState < HTMLMediaElement.HAVE_METADATA || // Ensure video is ready enough
-      !canvasRef.current
+      videoRef.current.readyState < HTMLMediaElement.HAVE_METADATA // Ensure video is ready enough
     ) {
       // Not ready yet, try again
       requestRef.current = requestAnimationFrame(predictWebcamLoop);
       return;
     }
 
-    const canvasCtx = canvasRef.current?.getContext('2d');
-    if (!canvasCtx) {
-      requestRef.current = requestAnimationFrame(predictWebcamLoop);
-      return;
-    }
+    processFrameAndDrawHands(
+      canvasRef.current!,
+      videoRef.current!,
+      gestureRecognizerRef.current!,
+      drawingUtilsRef.current!,
+      landmarkSmootherRef.current,
+      MAX_SUPPORTED_HANDS,
+    );
 
-    try {
-      const startTimeMs = performance.now();
-      const results = gestureRecognizerRef.current?.recognizeForVideo(
-        videoRef.current, // Already checked for null above
-        startTimeMs,
-      );
-
-      canvasCtx.save();
-      canvasCtx.clearRect(
-        0,
-        0,
-        canvasRef.current.width,
-        canvasRef.current.height,
-      );
-
-      if (
-        videoRef.current.videoWidth > 0 &&
-        videoRef.current.videoHeight > 0 &&
-        (canvasRef.current.width !== videoRef.current.videoWidth ||
-          canvasRef.current.height !== videoRef.current.videoHeight)
-      ) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-      }
-
-      if (results?.landmarks && drawingUtilsRef.current && landmarkSmootherRef.current.length > 0) {
-        const smoothedLandmarks = getSmoothedLandmarksForFrame(
-          results.landmarks,
-          landmarkSmootherRef.current,
-          MAX_SUPPORTED_HANDS
-        );
-        if (smoothedLandmarks.length > 0) {
-          drawHandsOnCanvas(drawingUtilsRef.current, smoothedLandmarks);
-        }
-      }
-      canvasCtx.restore();
-    } catch (err) {
-      console.error('Error in prediction loop:', err);
-    }
+    // TODO process Frame and update map
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
@@ -99,9 +56,6 @@ function MagicControl() {
       console.error('Video ref not available');
       return;
     }
-
-    console.log('Setting up webcam...');
-
     const constraints = { video: true };
     try {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -114,10 +68,8 @@ function MagicControl() {
             canvasRef.current.width = videoRef.current.videoWidth;
             canvasRef.current.height = videoRef.current.videoHeight;
           }
-
+        
           landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
-
-          console.log('Webcam ready. Starting prediction loop...');
           requestRef.current = requestAnimationFrame(predictWebcamLoop);
         }
       };
@@ -129,22 +81,23 @@ function MagicControl() {
     }
   }, [videoRef, canvasRef, landmarkSmootherRef, predictWebcamLoop]);
 
+
   useEffect(() => {
-    if (drawingUtilsRef.current) {
+    if (isDrawingUtilsReady && drawingUtilsRef.current) {
+      console.log('Webcam setup complete. Starting prediction loop...');
       setupWebcam().catch(console.error);
     }
     return () => {
       if (requestRef.current) {
         cancelAnimationFrame(requestRef.current);
       }
-      // Stop webcam tracks when component unmounts
       const videoElement = videoRef.current;
       if (videoElement && videoElement.srcObject) {
         const stream = videoElement.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
     };
-  }, [drawingUtilsRef, setupWebcam]);
+  }, [isDrawingUtilsReady, drawingUtilsRef, setupWebcam]);
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">
