@@ -1,6 +1,7 @@
 # Map Gesture Control
 
 ## Core tech stack
+
 - React
 - TypeScript
 - Vite
