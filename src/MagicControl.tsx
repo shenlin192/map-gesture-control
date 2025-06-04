@@ -68,7 +68,7 @@ function MagicControl() {
   const activeGestureRef = useRef<GestureType>('NONE');
   const [gestureRecLoaded, setGestureRecLoaded] = useState<boolean>(false);
   const [controlMode, setControlMode] = useState<ControlMode>('PAN');
-  const modeTimeoutRef = useRef<NodeJS.Timeout>();
+  const modeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastModeSwitchTime = useRef<number>(0);
   const MODE_SWITCH_DELAY = 300; // ms
 
