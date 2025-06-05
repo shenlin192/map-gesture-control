@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
 import type { MapRef } from 'react-map-gl/mapbox';
 import { useMediaPipe } from './hooks/useMediaPipe';
 import { useCanvasSetup } from './hooks/useCanvasSetup';
+import { useWebcamSetup } from './hooks/useWebcamSetup';
 import {
-  initializeEmaSmoothersForHands,
   processFrameAndDrawHands,
 } from './utils/handTrackingUtils';
 
@@ -51,53 +51,15 @@ function MagicControl() {
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
 
-  const setupWebcam = useCallback(async () => {
-    if (!videoRef.current) {
-      console.error('Video ref not available');
-      return;
-    }
-    const constraints = { video: true };
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      videoRef.current.srcObject = stream;
-      videoRef.current.onloadedmetadata = () => {
-        if (videoRef.current) {
-          videoRef.current.play();
-          
-          if (canvasRef.current) {
-            canvasRef.current.width = videoRef.current.videoWidth;
-            canvasRef.current.height = videoRef.current.videoHeight;
-          }
-        
-          landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
-          requestRef.current = requestAnimationFrame(predictWebcamLoop);
-        }
-      };
-      videoRef.current.onerror = () => {
-        console.error('Webcam access error.');
-      };
-    } catch (error) {
-      console.error('Error setting up webcam:', error);
-    }
-  }, [videoRef, canvasRef, landmarkSmootherRef, predictWebcamLoop]);
-
-
-  useEffect(() => {
-    if (isDrawingUtilsReady && drawingUtilsRef.current) {
-      console.log('Webcam setup complete. Starting prediction loop...');
-      setupWebcam().catch(console.error);
-    }
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
-      const videoElement = videoRef.current;
-      if (videoElement && videoElement.srcObject) {
-        const stream = videoElement.srcObject as MediaStream;
-        stream.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [isDrawingUtilsReady, drawingUtilsRef, setupWebcam]);
+  useWebcamSetup({
+    videoRef,
+    canvasRef,
+    landmarkSmootherRef,
+    requestRef,
+    predictWebcamLoop,
+    isReady: isDrawingUtilsReady && drawingUtilsRef.current !== null,
+    maxSupportedHands: MAX_SUPPORTED_HANDS,
+  });
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">
