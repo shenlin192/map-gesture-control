@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
@@ -8,6 +8,7 @@ import { useCanvasSetup } from './hooks/useCanvasSetup';
 import { useWebcamSetup } from './hooks/useWebcamSetup';
 import {
   processFrameAndDrawHands,
+  initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
 
 const MAX_SUPPORTED_HANDS = 2;
@@ -21,7 +22,12 @@ function MagicControl() {
   const landmarkSmootherRef = useRef<EMASmoother[][]>([]);
 
   const { gestureRecognizerRef, isMediaPipeLoaded } = useMediaPipe();
-  const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isMediaPipeLoaded });
+  const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeLoaded });
+  const { isWebcamReady } = useWebcamSetup({
+    videoRef,
+    canvasRef,
+    isReady: isDrawingUtilsReady && drawingUtilsRef.current !== null,
+  });
 
   const handleMapLoad = useCallback(() => {
     console.log('Map loaded successfully.');
@@ -51,15 +57,26 @@ function MagicControl() {
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
 
-  useWebcamSetup({
-    videoRef,
-    canvasRef,
-    landmarkSmootherRef,
-    requestRef,
-    predictWebcamLoop,
-    isReady: isDrawingUtilsReady && drawingUtilsRef.current !== null,
-    maxSupportedHands: MAX_SUPPORTED_HANDS,
-  });
+
+
+  // Start tracking loop when everything is ready
+  useEffect(() => {
+    if (isWebcamReady && isDrawingUtilsReady && gestureRecognizerRef.current) {
+      // Initialize EMA smoothers
+      landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
+      
+      // Start the tracking loop
+      if (requestRef.current) cancelAnimationFrame(requestRef.current);
+      requestRef.current = requestAnimationFrame(predictWebcamLoop);
+    }
+    
+    return () => {
+      if (requestRef.current) {
+        cancelAnimationFrame(requestRef.current);
+        requestRef.current = null;
+      }
+    };
+  }, [isWebcamReady, isDrawingUtilsReady, gestureRecognizerRef, predictWebcamLoop]);
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">

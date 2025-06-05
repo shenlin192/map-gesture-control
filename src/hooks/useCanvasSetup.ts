@@ -3,15 +3,15 @@ import { DrawingUtils } from '@mediapipe/tasks-vision';
 
 interface UseCanvasSetupProps {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  isMediaPipeLoaded: boolean;
+  isReady: boolean;
 }
 
-export function useCanvasSetup({ canvasRef, isMediaPipeLoaded }: UseCanvasSetupProps) {
+export function useCanvasSetup({ canvasRef, isReady }: UseCanvasSetupProps) {
   const [isDrawingUtilsReady, setIsDrawingUtilsReady] = useState<boolean>(false);
   const drawingUtilsRef = useRef<DrawingUtils | null>(null);
 
   useEffect(() => {
-    if (!isMediaPipeLoaded) {
+    if (!isReady) {
       drawingUtilsRef.current = null;
       setIsDrawingUtilsReady(false);
       return;
@@ -30,7 +30,7 @@ export function useCanvasSetup({ canvasRef, isMediaPipeLoaded }: UseCanvasSetupP
       drawingUtilsRef.current = null;
       setIsDrawingUtilsReady(false);
     }
-  }, [canvasRef, isMediaPipeLoaded]); 
+  }, [canvasRef, isReady]); 
 
   return { drawingUtilsRef, isDrawingUtilsReady };
 }

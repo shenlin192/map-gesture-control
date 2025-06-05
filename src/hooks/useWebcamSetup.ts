@@ -1,26 +1,17 @@
-import { useCallback, useEffect } from 'react';
-import type { EMASmoother } from '../components/EMASmoother';
-import { initializeEmaSmoothersForHands } from '../utils/handTrackingUtils';
+import { useCallback, useEffect, useState } from 'react';
 
 interface UseWebcamSetupProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  landmarkSmootherRef: { current: EMASmoother[][] };
-  requestRef: { current: number | null };
-  predictWebcamLoop: () => void;
   isReady: boolean;
-  maxSupportedHands: number;
 }
 
 export function useWebcamSetup({
   videoRef,
   canvasRef,
-  landmarkSmootherRef,
-  requestRef,
-  predictWebcamLoop,
   isReady,
-  maxSupportedHands,
 }: UseWebcamSetupProps) {
+  const [isWebcamReady, setIsWebcamReady] = useState(false);
   const setupWebcam = useCallback(async () => {
     if (!videoRef.current) {
       console.error('Video ref not available');
@@ -39,32 +30,33 @@ export function useWebcamSetup({
             canvasRef.current.height = videoRef.current.videoHeight;
           }
         
-          landmarkSmootherRef.current = initializeEmaSmoothersForHands(maxSupportedHands, 0.5);
-          requestRef.current = requestAnimationFrame(predictWebcamLoop);
+          setIsWebcamReady(true);
         }
       };
       videoRef.current.onerror = () => {
         console.error('Webcam access error.');
+        setIsWebcamReady(false);
       };
     } catch (error) {
       console.error('Error setting up webcam:', error);
+      setIsWebcamReady(false);
     }
-  }, [videoRef, canvasRef, landmarkSmootherRef, predictWebcamLoop, maxSupportedHands]);
+  }, [videoRef, canvasRef]);
 
   useEffect(() => {
     if (isReady) {
-      console.log('Webcam setup complete. Starting prediction loop...');
+      console.log('Webcam setup complete. Starting webcam...');
       setupWebcam().catch(console.error);
     }
     return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-      }
       const videoElement = videoRef.current;
       if (videoElement && videoElement.srcObject) {
         const stream = videoElement.srcObject as MediaStream;
         stream.getTracks().forEach((track) => track.stop());
       }
+      setIsWebcamReady(false);
     };
-  }, [isReady, setupWebcam, requestRef, videoRef]);
+  }, [isReady, setupWebcam, videoRef]);
+
+  return { isWebcamReady };
 }
