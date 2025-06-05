@@ -21,8 +21,8 @@ function MagicControl() {
   const requestRef = useRef<number | null>(null);
   const landmarkSmootherRef = useRef<EMASmoother[][]>([]);
 
-  const { gestureRecognizerRef, isMediaPipeLoaded } = useMediaPipe();
-  const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeLoaded });
+  const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
+  const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
   const { isWebcamReady } = useWebcamSetup({
     videoRef,
     canvasRef,
@@ -59,9 +59,9 @@ function MagicControl() {
 
 
 
-  // Start tracking loop when everything is ready
+  // Start tracking loop when webcam is ready
   useEffect(() => {
-    if (isWebcamReady && isDrawingUtilsReady && gestureRecognizerRef.current) {
+    if (isWebcamReady) {
       // Initialize EMA smoothers
       landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
       
@@ -76,7 +76,7 @@ function MagicControl() {
         requestRef.current = null;
       }
     };
-  }, [isWebcamReady, isDrawingUtilsReady, gestureRecognizerRef, predictWebcamLoop]);
+  }, [isWebcamReady, predictWebcamLoop]);
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">

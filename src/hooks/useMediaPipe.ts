@@ -6,7 +6,7 @@ const MEDIAPIPE_GESTURE_MODEL_PATH: string =
 
 export function useMediaPipe() {
   const gestureRecognizerRef = useRef<GestureRecognizer | null>(null);
-  const [isMediaPipeLoaded, setIsMediaPipeLoaded] = useState<boolean>(false);
+  const [isMediaPipeReady, setIsMediaPipeReady] = useState<boolean>(false);
 
   const initializeMediaPipe = useCallback(async () => {
     console.log('Initializing MediaPipe');
@@ -25,13 +25,13 @@ export function useMediaPipe() {
           numHands: 2,
         },
       );
-      setIsMediaPipeLoaded(true);
+      setIsMediaPipeReady(true);
       console.log('MediaPipe initialized successfully');
     } catch (error) {
       console.error('Failed to initialize MediaPipe:', error);
-      setIsMediaPipeLoaded(false);
+      setIsMediaPipeReady(false);
     }
-  }, [setIsMediaPipeLoaded]);
+  }, [setIsMediaPipeReady]);
 
   useEffect(() => {
     initializeMediaPipe();
@@ -39,6 +39,6 @@ export function useMediaPipe() {
 
   return {
     gestureRecognizerRef,
-    isMediaPipeLoaded,
+    isMediaPipeReady,
   };
 }
