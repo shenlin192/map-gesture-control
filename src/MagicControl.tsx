@@ -12,7 +12,7 @@ import {
   drawLandmarksOnCanvas,
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
-import { detectControlMode } from './utils/gestureUtils';
+import { detectControlMode, calculatePanVector } from './utils/gestureUtils';
 import type { ControlMode } from './types';
 
 const MAX_SUPPORTED_HANDS = 2;
@@ -27,6 +27,7 @@ function MagicControl() {
   
   const [currentControlMode, setCurrentControlMode] = useState<ControlMode>('IDLE');
   const [detectedGesture, setDetectedGesture] = useState<string>('None');
+  const [panVector, setPanVector] = useState<any>(null);
 
   const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
   const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
@@ -78,19 +79,29 @@ function MagicControl() {
       switch (controlMode) {
         case 'ZOOMING':
           setDetectedGesture('Pinch - Zoom Mode');
+          setPanVector(null);
           break;
         case 'PANNING':
-          setDetectedGesture('Pointing Up - Pan Mode');
+          const panVec = calculatePanVector(primaryHand);
+          setPanVector(panVec);
+          if (panVec.inDeadZone) {
+            setDetectedGesture('Pointing Up - In Dead Zone');
+          } else {
+            setDetectedGesture(`Pointing Up - Pan Active (Speed: ${(panVec.speed * 100).toFixed(0)}%)`);
+          }
           break;
         case 'IDLE':
           setDetectedGesture('Open Palm/Other - Idle');
+          setPanVector(null);
           break;
         default:
           setDetectedGesture('Unknown');
+          setPanVector(null);
       }
     } else {
       setCurrentControlMode('IDLE');
       setDetectedGesture('No hand detected');
+      setPanVector(null);
     }
     
     // Step 2: update map (not implemented yet)
@@ -126,21 +137,42 @@ function MagicControl() {
       <h1 className="text-3xl font-bold mb-4">Map Gesture Control</h1>
       
       <div className="mb-4 p-4 bg-gray-700 rounded-lg">
-        <div className="flex gap-6">
-          <div>
-            <span className="font-semibold">Control Mode: </span>
-            <span className={`px-2 py-1 rounded text-sm ${
-              currentControlMode === 'PANNING' ? 'bg-blue-600' :
-              currentControlMode === 'ZOOMING' ? 'bg-green-600' :
-              'bg-gray-600'
-            }`}>
-              {currentControlMode}
-            </span>
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-6">
+            <div>
+              <span className="font-semibold">Control Mode: </span>
+              <span className={`px-2 py-1 rounded text-sm ${
+                currentControlMode === 'PANNING' ? 'bg-blue-600' :
+                currentControlMode === 'ZOOMING' ? 'bg-green-600' :
+                'bg-gray-600'
+              }`}>
+                {currentControlMode}
+              </span>
+            </div>
+            <div>
+              <span className="font-semibold">Gesture: </span>
+              <span className="text-yellow-300">{detectedGesture}</span>
+            </div>
           </div>
-          <div>
-            <span className="font-semibold">Gesture: </span>
-            <span className="text-yellow-300">{detectedGesture}</span>
-          </div>
+          
+          {panVector && !panVector.inDeadZone && (
+            <div className="bg-gray-600 p-3 rounded text-sm">
+              <div className="font-semibold text-blue-300 mb-2">Pan Vector Info (Natural Scrolling):</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-300">Hand Direction:</span> ({panVector.rawDirection.x}, {panVector.rawDirection.y})
+                </div>
+                <div>
+                  <span className="text-green-300">Map Pan Direction:</span> ({panVector.x.toFixed(3)}, {panVector.y.toFixed(3)})
+                </div>
+                <div>Speed: {(panVector.speed * 100).toFixed(0)}%</div>
+                <div>Distance: {panVector.distance}</div>
+                <div className="col-span-2 text-gray-400 text-xs mt-1">
+                  Hand UP → Map DOWN | Hand DOWN → Map UP
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       

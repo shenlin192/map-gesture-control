@@ -57,6 +57,49 @@ export const isOpenPalm = (landmarks: NormalizedLandmark[]): boolean => {
   return true;
 };
 
+export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
+  if (!landmarks || landmarks.length === 0) return { x: 0, y: 0, speed: 0, inDeadZone: true };
+  
+  const indexTip = landmarks[8];
+  if (!indexTip) return { x: 0, y: 0, speed: 0, inDeadZone: true };
+  
+  // Define dead zone center and radius
+  const deadZoneCenter = { x: 0.5, y: 0.5 };
+  const deadZoneRadius = 0.15;
+  
+  // Calculate vector from dead zone center to finger tip
+  const vectorX = indexTip.x - deadZoneCenter.x;
+  const vectorY = indexTip.y - deadZoneCenter.y;
+  const distance = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+  
+  // Check if finger is in dead zone
+  if (distance <= deadZoneRadius) {
+    return { x: 0, y: 0, speed: 0, inDeadZone: true };
+  }
+  
+  // Calculate normalized direction and speed
+  const normalizedX = vectorX / distance;
+  const normalizedY = vectorY / distance;
+  
+  // Implement inverted control (natural scrolling)
+  // Hand UP (negative Y) -> Map pans DOWN (positive Y)
+  // Hand DOWN (positive Y) -> Map pans UP (negative Y)
+  const invertedY = -normalizedY;
+  
+  // Speed is proportional to distance from dead zone edge
+  const speedFactor = Math.min((distance - deadZoneRadius) / (0.5 - deadZoneRadius), 1.0);
+  
+  return {
+    x: normalizedX,
+    y: invertedY,
+    speed: speedFactor,
+    inDeadZone: false,
+    distance: distance.toFixed(3),
+    fingerPos: { x: indexTip.x.toFixed(3), y: indexTip.y.toFixed(3) },
+    rawDirection: { x: normalizedX.toFixed(3), y: normalizedY.toFixed(3) }
+  };
+};
+
 export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode => {
   if (!landmarks || landmarks.length === 0) return 'IDLE';
   
@@ -67,8 +110,6 @@ export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode 
   if (isPinchGesture(landmarks)) {
     return 'ZOOMING';
   }
-  
- 
   
   return 'IDLE';
 };
