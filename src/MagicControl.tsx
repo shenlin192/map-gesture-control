@@ -72,7 +72,7 @@ function MagicControl() {
       MAX_SUPPORTED_HANDS
     );
 
-     // Draw canvas with landmarks and dead zone
+     // Draw canvas with landmarks
      drawLandmarksOnCanvas(
       canvasRef.current!,
       videoRef.current!,
@@ -80,12 +80,11 @@ function MagicControl() {
       smoothedLandmarks,
     );
     
-    // Step 1: recognize intent based on landmarks
     let controlMode: ControlMode = 'IDLE';
+    
     if (smoothedLandmarks.length > 0) {
       const primaryHand = smoothedLandmarks[0];
       controlMode = detectControlMode(primaryHand);
-      
       setCurrentControlMode(controlMode);
       
       switch (controlMode) {
@@ -124,10 +123,7 @@ function MagicControl() {
   // Start tracking loop when webcam is ready
   useEffect(() => {
     if (isWebcamReady) {
-      // Initialize EMA smoothers
       landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
-      
-      // Start the tracking loop
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       requestRef.current = requestAnimationFrame(predictWebcamLoop);
     }
