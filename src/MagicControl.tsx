@@ -40,6 +40,13 @@ function MagicControl() {
     isReady: isDrawingUtilsReady,
   });
 
+  // Hook to handle map movement based on pan gestures
+  useMapControl({
+    mapRef,
+    controlMode: currentControlMode,
+    panVector,
+  });
+
   const handleMapLoad = useCallback(() => {
     console.log('Map loaded successfully.');
   }, []);
@@ -112,7 +119,6 @@ function MagicControl() {
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
-
 
 
   // Start tracking loop when webcam is ready

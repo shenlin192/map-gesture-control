@@ -14,21 +14,29 @@ export default function PanVectorInfo({ panVector }: PanVectorInfoProps) {
     return null;
   }
 
+  // Format numbers with fixed width to prevent layout shifts
+  const formatNumber = (num: number, decimals: number = 3) => {
+    return num.toFixed(decimals).padStart(6, ' ');
+  };
+
+  const formatSpeed = (speed: number) => {
+    return `${(speed * 100).toFixed(0).padStart(3, ' ')}%`;
+  };
+
   return (
-    <div className="bg-gray-600 p-3 rounded text-sm">
+    <div className="bg-gray-600 p-3 rounded text-sm w-80">
       <div className="font-semibold text-blue-300 mb-2">Pan Vector Info (Natural Scrolling):</div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-2 text-xs font-mono">
         <div>
-          <span className="text-gray-300">Hand Direction:</span> ({panVector.rawDirection.x}, {panVector.rawDirection.y})
+          <span className="text-gray-300">Hand Direction:</span>
+          <div>({formatNumber(parseFloat(panVector.rawDirection.x))}, {formatNumber(parseFloat(panVector.rawDirection.y))})</div>
         </div>
         <div>
-          <span className="text-green-300">Map Pan Direction:</span> ({panVector.x.toFixed(3)}, {panVector.y.toFixed(3)})
+          <span className="text-green-300">Map Pan Direction:</span>
+          <div>({formatNumber(panVector.x)}, {formatNumber(panVector.y)})</div>
         </div>
-        <div>Speed: {(panVector.speed * 100).toFixed(0)}%</div>
-        <div>Distance: {panVector.distance}</div>
-        <div className="col-span-2 text-gray-400 text-xs mt-1">
-          Hand UP → Map DOWN | Hand DOWN → Map UP
-        </div>
+        <div>Speed: {formatSpeed(panVector.speed)}</div>
+        <div>Distance: {panVector.distance.padStart(5, ' ')}</div>
       </div>
     </div>
   );

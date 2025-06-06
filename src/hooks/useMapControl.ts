@@ -40,7 +40,7 @@ export function useMapControl({ mapRef, controlMode, panVector }: UseMapControlP
       lastUpdateRef.current = currentTime;
 
       // Base movement speed (pixels per second)
-      const baseSpeed = 200; // Adjust this value to control overall sensitivity
+      const baseSpeed = 500; // Adjust this value to control overall sensitivity
       
       // Calculate movement distance based on speed, direction, and time
       const moveX = panVector.x * panVector.speed * baseSpeed * (deltaTime / 1000);
@@ -48,7 +48,13 @@ export function useMapControl({ mapRef, controlMode, panVector }: UseMapControlP
 
       // Apply movement to map
       try {
-        mapRef.current.panBy([moveX, moveY]);
+        const map = mapRef.current.getMap();
+        if (map) {
+          // Try panBy with duration 0 first
+          map.panBy([moveX, moveY], { duration: 0 });
+        } else {
+          console.error('Map instance not found');
+        }
       } catch (err) {
         console.error('Error panning map:', err);
       }

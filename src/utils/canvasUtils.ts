@@ -38,7 +38,6 @@ export function drawDeadZone(canvas: HTMLCanvasElement) {
   const centerY = deadZoneCenter.y * canvas.height;
   const radius = deadZoneRadius * Math.min(canvas.width, canvas.height);
   
-  console.log(`Drawing dead zone: center(${centerX}, ${centerY}), radius=${radius}, canvas size(${canvas.width}, ${canvas.height})`);
   
   canvasCtx.save();
   
