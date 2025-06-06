@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
@@ -7,9 +7,13 @@ import { useMediaPipe } from './hooks/useMediaPipe';
 import { useCanvasSetup } from './hooks/useCanvasSetup';
 import { useWebcamSetup } from './hooks/useWebcamSetup';
 import {
-  processFrameAndDrawHands,
+  recognizeGesturesInFrame,
+  getSmoothLandmarks,
+  drawLandmarksOnCanvas,
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
+import { detectControlMode } from './utils/gestureUtils';
+import type { ControlMode } from './types';
 
 const MAX_SUPPORTED_HANDS = 2;
 
@@ -20,6 +24,9 @@ function MagicControl() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const requestRef = useRef<number | null>(null);
   const landmarkSmootherRef = useRef<EMASmoother[][]>([]);
+  
+  const [currentControlMode, setCurrentControlMode] = useState<ControlMode>('IDLE');
+  const [detectedGesture, setDetectedGesture] = useState<string>('None');
 
   const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
   const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
@@ -43,16 +50,52 @@ function MagicControl() {
       return;
     }
 
-    processFrameAndDrawHands(
+    const results = recognizeGesturesInFrame(
+      videoRef.current!,
+      gestureRecognizerRef.current!
+    );
+    
+    const smoothedLandmarks = getSmoothLandmarks(
+      results,
+      landmarkSmootherRef.current,
+      MAX_SUPPORTED_HANDS
+    );
+    
+    drawLandmarksOnCanvas(
       canvasRef.current!,
       videoRef.current!,
-      gestureRecognizerRef.current!,
       drawingUtilsRef.current!,
-      landmarkSmootherRef.current,
-      MAX_SUPPORTED_HANDS,
+      smoothedLandmarks
     );
 
-    // TODO process Frame and update map
+    // Step 1: recognize intent based on landmarks
+    if (smoothedLandmarks.length > 0) {
+      const primaryHand = smoothedLandmarks[0];
+      const controlMode = detectControlMode(primaryHand);
+      
+      setCurrentControlMode(controlMode);
+      
+      switch (controlMode) {
+        case 'ZOOMING':
+          setDetectedGesture('Pinch - Zoom Mode');
+          break;
+        case 'PANNING':
+          setDetectedGesture('Pointing Up - Pan Mode');
+          break;
+        case 'IDLE':
+          setDetectedGesture('Open Palm/Other - Idle');
+          break;
+        default:
+          setDetectedGesture('Unknown');
+      }
+    } else {
+      setCurrentControlMode('IDLE');
+      setDetectedGesture('No hand detected');
+    }
+    
+    // Step 2: update map (not implemented yet)
+    
+    
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
@@ -80,8 +123,28 @@ function MagicControl() {
 
   return (
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">
-      <h1 className="text-3xl font-bold mb-4">Mapbox Hand Landmark Display</h1>
-      <div className="w-full flex flex-col md:flex-row gap-4">
+      <h1 className="text-3xl font-bold mb-4">Map Gesture Control</h1>
+      
+      <div className="mb-4 p-4 bg-gray-700 rounded-lg">
+        <div className="flex gap-6">
+          <div>
+            <span className="font-semibold">Control Mode: </span>
+            <span className={`px-2 py-1 rounded text-sm ${
+              currentControlMode === 'PANNING' ? 'bg-blue-600' :
+              currentControlMode === 'ZOOMING' ? 'bg-green-600' :
+              'bg-gray-600'
+            }`}>
+              {currentControlMode}
+            </span>
+          </div>
+          <div>
+            <span className="font-semibold">Gesture: </span>
+            <span className="text-yellow-300">{detectedGesture}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="w-full h-full flex flex-col md:flex-row gap-3">
         <ReactMap
           containerRef={mapComponentContainerRef}
           mapRef={mapRef}

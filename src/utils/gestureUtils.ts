@@ -1,7 +1,7 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import type { ControlMode } from '../types';
 
-// I don't know what this is for
-export const isIndexPointingCustom = (
+export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
 ): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
@@ -33,4 +33,42 @@ export const isIndexPointingCustom = (
   const ringCurled = rngT.y > rngP.y - yTol;
   const pinkyCurled = pkyT.y > pkyP.y - yTol;
   return indexExtended && middleCurled && ringCurled && pinkyCurled;
+};
+
+export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
+  return false;
+};
+
+export const isOpenPalm = (landmarks: NormalizedLandmark[]): boolean => {
+  if (!landmarks || landmarks.length === 0) return false;
+  
+  const fingerTips = [8, 12, 16, 20];
+  const fingerBases = [6, 10, 14, 18];
+  
+  for (let i = 0; i < fingerTips.length; i++) {
+    const tip = landmarks[fingerTips[i]];
+    const base = landmarks[fingerBases[i]];
+    
+    if (!tip || !base) return false;
+    
+    if (tip.y > base.y) return false;
+  }
+  
+  return true;
+};
+
+export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode => {
+  if (!landmarks || landmarks.length === 0) return 'IDLE';
+  
+  if (isIndexPointingUp(landmarks)) {
+    return 'PANNING';
+  }
+
+  if (isPinchGesture(landmarks)) {
+    return 'ZOOMING';
+  }
+  
+ 
+  
+  return 'IDLE';
 };

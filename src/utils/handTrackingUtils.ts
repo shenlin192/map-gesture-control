@@ -53,46 +53,60 @@ export function drawHandsOnCanvas(
   });
 }
 
-export function processFrameAndDrawHands(
+export function recognizeGesturesInFrame(
+  video: HTMLVideoElement,
+  gestureRecognizer: GestureRecognizer
+) {
+  try {
+    const startTimeMs = performance.now();
+    return gestureRecognizer.recognizeForVideo(video, startTimeMs);
+  } catch (err) {
+    console.error('Error in recognizeGesturesInFrame:', err);
+    return null;
+  }
+}
+
+export function getSmoothLandmarks(
+  results: any,
+  landmarkSmoothers: EMASmoother[][],
+  maxSupportedHands: number
+): NormalizedLandmark[][] {
+  if (!results?.landmarks || landmarkSmoothers.length === 0) {
+    return [];
+  }
+  
+  return getSmoothedLandmarksForFrame(
+    results.landmarks,
+    landmarkSmoothers,
+    maxSupportedHands
+  );
+}
+
+export function drawLandmarksOnCanvas(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
-  gestureRecognizer: GestureRecognizer,
   drawingUtils: DrawingUtils,
-  landmarkSmoothers: EMASmoother[][],
-  maxSupportedHands: number,
+  smoothedLandmarks: NormalizedLandmark[][]
 ) {
   const canvasCtx = canvas.getContext('2d');
   if (!canvasCtx) {
-    console.error('processFrameAndDrawHands: Failed to get 2D context from canvas.');
+    console.error('drawLandmarksOnCanvas: Failed to get 2D context from canvas.');
     return;
   }
 
-  try {
-    const startTimeMs = performance.now();
-    const results = gestureRecognizer.recognizeForVideo(video, startTimeMs);
+  canvasCtx.save();
+  canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
+  if (video.videoWidth > 0 && video.videoHeight > 0) {
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
     }
-
-    if (results?.landmarks && landmarkSmoothers.length > 0) {
-      const smoothedLandmarks = getSmoothedLandmarksForFrame(
-        results.landmarks,
-        landmarkSmoothers,
-        maxSupportedHands,
-      );
-      if (smoothedLandmarks.length > 0) {
-        drawHandsOnCanvas(drawingUtils, smoothedLandmarks);
-      }
-    }
-    canvasCtx.restore();
-  } catch (err) {
-    console.error('Error in processFrameAndDrawHands:', err);
   }
+
+  if (smoothedLandmarks.length > 0) {
+    drawHandsOnCanvas(drawingUtils, smoothedLandmarks);
+  }
+  
+  canvasCtx.restore();
 }
