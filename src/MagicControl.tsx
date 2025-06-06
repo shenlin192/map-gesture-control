@@ -99,7 +99,8 @@ function MagicControl() {
           if (panVec.inDeadZone) {
             setDetectedGesture('Pointing Up - In Dead Zone');
           } else {
-            setDetectedGesture(`Pointing Up - Pan Active (Speed: ${(panVec.speed * 100).toFixed(0)}%)`);
+            const speedPercentage = (panVec.speed * 100).toFixed(0).padStart(3, ' ');
+            setDetectedGesture(`Pointing Up - Pan Active (Speed: ${speedPercentage}%)`);
           }
           break;
         case 'IDLE':
