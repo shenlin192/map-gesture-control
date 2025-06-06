@@ -9,9 +9,9 @@ import { useWebcamSetup } from './hooks/useWebcamSetup';
 import {
   recognizeGesturesInFrame,
   getSmoothLandmarks,
-  drawLandmarksOnCanvas,
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
+import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
 import { detectControlMode, calculatePanVector } from './utils/gestureUtils';
 import type { ControlMode } from './types';
 
@@ -61,18 +61,20 @@ function MagicControl() {
       landmarkSmootherRef.current,
       MAX_SUPPORTED_HANDS
     );
-    
-    drawLandmarksOnCanvas(
+
+     // Draw canvas with landmarks and dead zone
+     drawLandmarksOnCanvas(
       canvasRef.current!,
       videoRef.current!,
       drawingUtilsRef.current!,
-      smoothedLandmarks
+      smoothedLandmarks,
     );
-
+    
     // Step 1: recognize intent based on landmarks
+    let controlMode: ControlMode = 'IDLE';
     if (smoothedLandmarks.length > 0) {
       const primaryHand = smoothedLandmarks[0];
-      const controlMode = detectControlMode(primaryHand);
+      controlMode = detectControlMode(primaryHand);
       
       setCurrentControlMode(controlMode);
       
@@ -103,6 +105,10 @@ function MagicControl() {
       setDetectedGesture('No hand detected');
       setPanVector(null);
     }
+    
+   if (controlMode === 'PANNING') {
+     drawDeadZone(canvasRef.current!);
+   }
     
     // Step 2: update map (not implemented yet)
     
@@ -155,6 +161,18 @@ function MagicControl() {
             </div>
           </div>
           
+          
+        </div>
+      </div>
+      
+      <div className="w-full h-full flex flex-col md:flex-row gap-3">
+        <ReactMap
+          containerRef={mapComponentContainerRef}
+          mapRef={mapRef}
+          onMapLoad={handleMapLoad}
+        />
+        <div className="w-full md:w-1/3 flex flex-col items-center gap-3">
+          <CameraView videoRef={videoRef} canvasRef={canvasRef} />
           {panVector && !panVector.inDeadZone && (
             <div className="bg-gray-600 p-3 rounded text-sm">
               <div className="font-semibold text-blue-300 mb-2">Pan Vector Info (Natural Scrolling):</div>
@@ -173,17 +191,6 @@ function MagicControl() {
               </div>
             </div>
           )}
-        </div>
-      </div>
-      
-      <div className="w-full h-full flex flex-col md:flex-row gap-3">
-        <ReactMap
-          containerRef={mapComponentContainerRef}
-          mapRef={mapRef}
-          onMapLoad={handleMapLoad}
-        />
-        <div className="w-full md:w-1/3 flex flex-col items-center gap-3">
-          <CameraView videoRef={videoRef} canvasRef={canvasRef} />
         </div>
       </div>
     </div>
