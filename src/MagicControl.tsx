@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
+import PanVectorInfo from './components/PanVectorInfo.tsx';
+import ControlStatus from './components/ControlStatus.tsx';
 import type { MapRef } from 'react-map-gl/mapbox';
 import { useMediaPipe } from './hooks/useMediaPipe';
 import { useCanvasSetup } from './hooks/useCanvasSetup';
 import { useWebcamSetup } from './hooks/useWebcamSetup';
+import { useMapControl } from './hooks/useMapControl';
 import {
   recognizeGesturesInFrame,
   getSmoothLandmarks,
@@ -86,6 +89,7 @@ function MagicControl() {
         case 'PANNING':
           const panVec = calculatePanVector(primaryHand);
           setPanVector(panVec);
+          drawDeadZone(canvasRef.current!); 
           if (panVec.inDeadZone) {
             setDetectedGesture('Pointing Up - In Dead Zone');
           } else {
@@ -105,14 +109,6 @@ function MagicControl() {
       setDetectedGesture('No hand detected');
       setPanVector(null);
     }
-    
-   if (controlMode === 'PANNING') {
-     drawDeadZone(canvasRef.current!);
-   }
-    
-    // Step 2: update map (not implemented yet)
-    
-    
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
@@ -142,28 +138,10 @@ function MagicControl() {
     <div className="w-full flex flex-col h-screen bg-gray-800 text-white items-center p-4 font-sans">
       <h1 className="text-3xl font-bold mb-4">Map Gesture Control</h1>
       
-      <div className="mb-4 p-4 bg-gray-700 rounded-lg">
-        <div className="flex flex-col gap-3">
-          <div className="flex gap-6">
-            <div>
-              <span className="font-semibold">Control Mode: </span>
-              <span className={`px-2 py-1 rounded text-sm ${
-                currentControlMode === 'PANNING' ? 'bg-blue-600' :
-                currentControlMode === 'ZOOMING' ? 'bg-green-600' :
-                'bg-gray-600'
-              }`}>
-                {currentControlMode}
-              </span>
-            </div>
-            <div>
-              <span className="font-semibold">Gesture: </span>
-              <span className="text-yellow-300">{detectedGesture}</span>
-            </div>
-          </div>
-          
-          
-        </div>
-      </div>
+      <ControlStatus 
+        currentControlMode={currentControlMode} 
+        detectedGesture={detectedGesture} 
+      />
       
       <div className="w-full h-full flex flex-col md:flex-row gap-3">
         <ReactMap
@@ -173,24 +151,7 @@ function MagicControl() {
         />
         <div className="w-full md:w-1/3 flex flex-col items-center gap-3">
           <CameraView videoRef={videoRef} canvasRef={canvasRef} />
-          {panVector && !panVector.inDeadZone && (
-            <div className="bg-gray-600 p-3 rounded text-sm">
-              <div className="font-semibold text-blue-300 mb-2">Pan Vector Info (Natural Scrolling):</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <span className="text-gray-300">Hand Direction:</span> ({panVector.rawDirection.x}, {panVector.rawDirection.y})
-                </div>
-                <div>
-                  <span className="text-green-300">Map Pan Direction:</span> ({panVector.x.toFixed(3)}, {panVector.y.toFixed(3)})
-                </div>
-                <div>Speed: {(panVector.speed * 100).toFixed(0)}%</div>
-                <div>Distance: {panVector.distance}</div>
-                <div className="col-span-2 text-gray-400 text-xs mt-1">
-                  Hand UP → Map DOWN | Hand DOWN → Map UP
-                </div>
-              </div>
-            </div>
-          )}
+          <PanVectorInfo panVector={panVector} />
         </div>
       </div>
     </div>
