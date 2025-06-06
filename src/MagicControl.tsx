@@ -26,7 +26,7 @@ function MagicControl() {
   const { isWebcamReady } = useWebcamSetup({
     videoRef,
     canvasRef,
-    isReady: isDrawingUtilsReady && drawingUtilsRef.current !== null,
+    isReady: isDrawingUtilsReady,
   });
 
   const handleMapLoad = useCallback(() => {

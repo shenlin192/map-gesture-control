@@ -18,13 +18,14 @@ function ReactMap({ mapRef, containerRef, onMapLoad }: Props) {
         ref={mapRef}
         onLoad={onMapLoad}
         initialViewState={{
-          longitude: -74.5,
-          latitude: 40,
+          longitude: 2.3333333,
+          latitude: 48.866667,
           zoom: 9,
+          pitch: 30,
         }}
         mapboxAccessToken={import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}
         style={{ height: '100%' }}
-        mapStyle="mapbox://styles/mapbox/streets-v12"
+        mapStyle="mapbox://styles/mapbox/standard"
       ></Map>
     </div>
   );
