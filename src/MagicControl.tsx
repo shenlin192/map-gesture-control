@@ -16,96 +16,9 @@ import {
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
 import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
-import { detectControlMode, calculatePanVector, calculateZoomSpeed } from './utils/gestureUtils';
+import { processGestureState } from './utils/gestureUtils';
 import type { ControlMode } from './types';
-import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { MAX_SUPPORTED_HANDS } from './utils/constants';
-
-// Helper function to format speed percentage
-const formatSpeedPercentage = (speed: number): string => {
-  return (speed * 100).toFixed(0).padStart(3, ' ');
-};
-
-// Helper function to generate gesture text based on control mode and state
-const generateGestureText = (controlMode: ControlMode, vectorInfo: any): string => {
-  switch (controlMode) {
-    case 'ZOOM_IN':
-    case 'ZOOM_OUT':
-      const gestureLabel = controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch';
-      if (vectorInfo.inDeadZone) {
-        return `${gestureLabel} - In Dead Zone`;
-      }
-      const zoomDirection = controlMode.replace('_', ' ');
-      return `${gestureLabel} - ${zoomDirection} (Speed: ${formatSpeedPercentage(vectorInfo.speed)}%)`;
-    
-    case 'PANNING':
-      if (vectorInfo.inDeadZone) {
-        return 'Pointing Up - In Dead Zone';
-      }
-      return `Pointing Up - Pan Active (Speed: ${formatSpeedPercentage(vectorInfo.speed)}%)`;
-    
-    case 'IDLE':
-      return 'Open Palm/Other - Idle';
-    
-    default:
-      return 'Unknown';
-  }
-};
-
-// Helper function to process gesture state from landmarks
-const processGestureState = (smoothedLandmarks: NormalizedLandmark[][]) => {
-  if (smoothedLandmarks.length === 0) {
-    return {
-      controlMode: 'IDLE' as ControlMode,
-      detectedGesture: 'No hand detected',
-      panVector: null,
-      zoomVector: null,
-      shouldDrawDeadZone: false
-    };
-  }
-
-  const primaryHand = smoothedLandmarks[0];
-  const controlMode = detectControlMode(primaryHand);
-  
-  switch (controlMode) {
-    case 'ZOOM_IN':
-    case 'ZOOM_OUT':
-      const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
-      const zoomVec = {
-        direction: controlMode,
-        ...zoomSpeedInfo
-      };
-      
-      return {
-        controlMode,
-        detectedGesture: generateGestureText(controlMode, zoomVec),
-        panVector: null,
-        zoomVector: zoomVec,
-        shouldDrawDeadZone: true
-      };
-
-    case 'PANNING':
-      const panVec = calculatePanVector(primaryHand);
-      
-      return {
-        controlMode,
-        detectedGesture: generateGestureText(controlMode, panVec),
-        panVector: panVec,
-        zoomVector: null,
-        shouldDrawDeadZone: true
-      };
-
-    default: // 'IDLE' and unknown cases
-      return {
-        controlMode,
-        detectedGesture: generateGestureText(controlMode, null),
-        panVector: null,
-        zoomVector: null,
-        shouldDrawDeadZone: false
-      };
-  }
-};
-
 
 function MagicControl() {
   const mapComponentContainerRef = useRef<HTMLDivElement>(null);
@@ -116,7 +29,6 @@ function MagicControl() {
   const landmarkSmootherRef = useRef<EMASmoother[][]>([]);
   
   const [currentControlMode, setCurrentControlMode] = useState<ControlMode>('IDLE');
-  const [detectedGesture, setDetectedGesture] = useState<string>('None');
   const [panVector, setPanVector] = useState<any>(null);
   const [zoomVector, setZoomVector] = useState<any>(null);
 
@@ -128,16 +40,11 @@ function MagicControl() {
     isReady: isDrawingUtilsReady,
   });
 
-  // Hook to handle map movement based on pan gestures
   useMapControl({
     mapRef,
     controlMode: currentControlMode,
     panVector,
   });
-
-  const handleMapLoad = useCallback(() => {
-    console.log('Map loaded successfully.');
-  }, []);
 
   const predictWebcamLoop: () => void = useCallback(() => {
     if (
@@ -149,37 +56,35 @@ function MagicControl() {
       return;
     }
 
+    // step 1: recognize gestures in frame
     const results = recognizeGesturesInFrame(
       videoRef.current!,
       gestureRecognizerRef.current!
     );
     
+    // step 2: smooth landmarks
     const smoothedLandmarks = getSmoothLandmarks(
       results,
       landmarkSmootherRef.current,
       MAX_SUPPORTED_HANDS
     );
     
-     // Draw canvas with landmarks
-     drawLandmarksOnCanvas(
+    // step 3: draw landmarks and dead zone on canvas
+    drawLandmarksOnCanvas(
       canvasRef.current!,
       videoRef.current!,
       drawingUtilsRef.current!,
       smoothedLandmarks,
     );
+    // TODO: no need to draw dead zone for each frame
+    drawDeadZone(canvasRef.current!);
     
-    // Process gesture state and update component state
+    // step 4: deduce user intent 
     const gestureState = processGestureState(smoothedLandmarks);
     setCurrentControlMode(gestureState.controlMode);
-    setDetectedGesture(gestureState.detectedGesture);
     setPanVector(gestureState.panVector);
     setZoomVector(gestureState.zoomVector);
     
-    // Draw dead zone if needed
-    if (gestureState.shouldDrawDeadZone && canvasRef.current) {
-      drawDeadZone(canvasRef.current);
-    }
-
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
 
@@ -206,14 +111,15 @@ function MagicControl() {
       
       <ControlStatus 
         currentControlMode={currentControlMode} 
-        detectedGesture={detectedGesture} 
+        panVector={panVector}
+        zoomVector={zoomVector}
       />
       
       <div className="w-full h-full flex flex-col md:flex-row gap-3">
         <ReactMap
           containerRef={mapComponentContainerRef}
           mapRef={mapRef}
-          onMapLoad={handleMapLoad}
+          onMapLoad={() => {}}
         />
         <div className="w-full md:w-1/3 flex flex-col items-center gap-3">
           <CameraView videoRef={videoRef} canvasRef={canvasRef} />

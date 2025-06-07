@@ -145,3 +145,48 @@ export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode 
   
   return 'IDLE';
 };
+
+export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][]) => {
+  if (smoothedLandmarks.length === 0) {
+    return {
+      controlMode: 'IDLE' as ControlMode,
+      panVector: null,
+      zoomVector: null,
+    };
+  }
+
+  const primaryHand = smoothedLandmarks[0];
+  const controlMode = detectControlMode(primaryHand);
+  
+  switch (controlMode) {
+    case 'ZOOM_IN':
+    case 'ZOOM_OUT':
+      const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
+      const zoomVec = {
+        direction: controlMode,
+        ...zoomSpeedInfo
+      };
+      
+      return {
+        controlMode,
+        panVector: null,
+        zoomVector: zoomVec,
+      };
+
+    case 'PANNING':
+      const panVec = calculatePanVector(primaryHand);
+      
+      return {
+        controlMode,
+        panVector: panVec,
+        zoomVector: null,
+      };
+
+    default: // 'IDLE' and unknown cases
+      return {
+        controlMode,
+        panVector: null,
+        zoomVector: null,
+      };
+  }
+};
