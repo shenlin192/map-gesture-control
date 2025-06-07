@@ -1,6 +1,7 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
 import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD } from './constants';
+import { calculateDistance } from './geometry';
 
 export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
@@ -42,10 +43,7 @@ export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean =>
   if (!thumbTip || !indexTip) return false;
   
   // Calculate distance between thumb and index finger tips
-  const distance = Math.sqrt(
-    Math.pow(thumbTip.x - indexTip.x, 2) + 
-    Math.pow(thumbTip.y - indexTip.y, 2)
-  );
+  const distance = calculateDistance(thumbTip, indexTip);
   
   // Close pinch for zoom out - fingers close together
   return distance < CLOSE_PINCH_THRESHOLD;
@@ -59,17 +57,11 @@ export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => 
   if (!thumbTip || !indexTip || !middlePIP) return false;
   
   // Calculate distance between thumb and index finger tips
-  const thumbIndexDistance = Math.sqrt(
-    Math.pow(thumbTip.x - indexTip.x, 2) + 
-    Math.pow(thumbTip.y - indexTip.y, 2)
-  );
+  const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
   
   // Check if thumb is extended by measuring distance to middle finger PIP joint
   // When thumb is extended, it's farther from middle PIP than when curled
-  const thumbMiddleDistance = Math.sqrt(
-    Math.pow(thumbTip.x - middlePIP.x, 2) + 
-    Math.pow(thumbTip.y - middlePIP.y, 2)
-  );
+  const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
   
   const thumbExtended = thumbMiddleDistance > THUMB_EXTENDED_THRESHOLD;
   
