@@ -18,8 +18,94 @@ import {
 import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
 import { detectControlMode, calculatePanVector, calculateZoomSpeed } from './utils/gestureUtils';
 import type { ControlMode } from './types';
+import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { MAX_SUPPORTED_HANDS } from './utils/constants';
 
-const MAX_SUPPORTED_HANDS = 2;
+// Helper function to format speed percentage
+const formatSpeedPercentage = (speed: number): string => {
+  return (speed * 100).toFixed(0).padStart(3, ' ');
+};
+
+// Helper function to generate gesture text based on control mode and state
+const generateGestureText = (controlMode: ControlMode, vectorInfo: any): string => {
+  switch (controlMode) {
+    case 'ZOOM_IN':
+    case 'ZOOM_OUT':
+      const gestureLabel = controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch';
+      if (vectorInfo.inDeadZone) {
+        return `${gestureLabel} - In Dead Zone`;
+      }
+      const zoomDirection = controlMode.replace('_', ' ');
+      return `${gestureLabel} - ${zoomDirection} (Speed: ${formatSpeedPercentage(vectorInfo.speed)}%)`;
+    
+    case 'PANNING':
+      if (vectorInfo.inDeadZone) {
+        return 'Pointing Up - In Dead Zone';
+      }
+      return `Pointing Up - Pan Active (Speed: ${formatSpeedPercentage(vectorInfo.speed)}%)`;
+    
+    case 'IDLE':
+      return 'Open Palm/Other - Idle';
+    
+    default:
+      return 'Unknown';
+  }
+};
+
+// Helper function to process gesture state from landmarks
+const processGestureState = (smoothedLandmarks: NormalizedLandmark[][]) => {
+  if (smoothedLandmarks.length === 0) {
+    return {
+      controlMode: 'IDLE' as ControlMode,
+      detectedGesture: 'No hand detected',
+      panVector: null,
+      zoomVector: null,
+      shouldDrawDeadZone: false
+    };
+  }
+
+  const primaryHand = smoothedLandmarks[0];
+  const controlMode = detectControlMode(primaryHand);
+  
+  switch (controlMode) {
+    case 'ZOOM_IN':
+    case 'ZOOM_OUT':
+      const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
+      const zoomVec = {
+        direction: controlMode,
+        ...zoomSpeedInfo
+      };
+      
+      return {
+        controlMode,
+        detectedGesture: generateGestureText(controlMode, zoomVec),
+        panVector: null,
+        zoomVector: zoomVec,
+        shouldDrawDeadZone: true
+      };
+
+    case 'PANNING':
+      const panVec = calculatePanVector(primaryHand);
+      
+      return {
+        controlMode,
+        detectedGesture: generateGestureText(controlMode, panVec),
+        panVector: panVec,
+        zoomVector: null,
+        shouldDrawDeadZone: true
+      };
+
+    default: // 'IDLE' and unknown cases
+      return {
+        controlMode,
+        detectedGesture: generateGestureText(controlMode, null),
+        panVector: null,
+        zoomVector: null,
+        shouldDrawDeadZone: false
+      };
+  }
+};
+
 
 function MagicControl() {
   const mapComponentContainerRef = useRef<HTMLDivElement>(null);
@@ -82,59 +168,16 @@ function MagicControl() {
       smoothedLandmarks,
     );
     
-    let controlMode: ControlMode = 'IDLE';
+    // Process gesture state and update component state
+    const gestureState = processGestureState(smoothedLandmarks);
+    setCurrentControlMode(gestureState.controlMode);
+    setDetectedGesture(gestureState.detectedGesture);
+    setPanVector(gestureState.panVector);
+    setZoomVector(gestureState.zoomVector);
     
-    if (smoothedLandmarks.length > 0) {
-      const primaryHand = smoothedLandmarks[0];
-      controlMode = detectControlMode(primaryHand);
-      setCurrentControlMode(controlMode);
-      
-      switch (controlMode) {
-        case 'ZOOM_IN':
-        case 'ZOOM_OUT':
-          const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
-          const zoomVec = {
-            direction: controlMode,
-            ...zoomSpeedInfo
-          };
-          setZoomVector(zoomVec);
-          setPanVector(null);
-          drawDeadZone(canvasRef.current!);
-          
-          if (zoomVec.inDeadZone) {
-            setDetectedGesture(`${controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch'} - In Dead Zone`);
-          } else {
-            const speedPercentage = (zoomVec.speed * 100).toFixed(0).padStart(3, ' ');
-            setDetectedGesture(`${controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch'} - ${controlMode.replace('_', ' ')} (Speed: ${speedPercentage}%)`);
-          }
-          break;
-        case 'PANNING':
-          const panVec = calculatePanVector(primaryHand);
-          setPanVector(panVec);
-          setZoomVector(null);
-          drawDeadZone(canvasRef.current!); 
-          if (panVec.inDeadZone) {
-            setDetectedGesture('Pointing Up - In Dead Zone');
-          } else {
-            const speedPercentage = (panVec.speed * 100).toFixed(0).padStart(3, ' ');
-            setDetectedGesture(`Pointing Up - Pan Active (Speed: ${speedPercentage}%)`);
-          }
-          break;
-        case 'IDLE':
-          setDetectedGesture('Open Palm/Other - Idle');
-          setPanVector(null);
-          setZoomVector(null);
-          break;
-        default:
-          setDetectedGesture('Unknown');
-          setPanVector(null);
-          setZoomVector(null);
-      }
-    } else {
-      setCurrentControlMode('IDLE');
-      setDetectedGesture('No hand detected');
-      setPanVector(null);
-      setZoomVector(null);
+    // Draw dead zone if needed
+    if (gestureState.shouldDrawDeadZone && canvasRef.current) {
+      drawDeadZone(canvasRef.current);
     }
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);

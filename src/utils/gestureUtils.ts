@@ -1,6 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD } from './constants';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD, THUMB_CURL_THRESHOLD } from './constants';
 import { calculateDistance } from './geometry';
 
 export const isIndexPointingUp = (
@@ -28,54 +28,48 @@ export const isIndexPointingUp = (
     !pkyP
   )
     return false;
+  
+  const thumbTip = hand[4];
+  const middlePIP = hand[10];
+
+  const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
+  const thumbCurled = thumbMiddleDistance < THUMB_CURL_THRESHOLD;
   const indexExtended = idxT.y < idxP.y && idxP.y < idxM.y;
   const yTol = 0.04;
   const middleCurled = midT.y > midP.y - yTol;
   const ringCurled = rngT.y > rngP.y - yTol;
   const pinkyCurled = pkyT.y > pkyP.y - yTol;
-  return indexExtended && middleCurled && ringCurled && pinkyCurled;
+
+  return indexExtended && middleCurled && ringCurled && pinkyCurled && thumbCurled;
 };
 
 export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
-  
   if (!thumbTip || !indexTip) return false;
-  
-  // Calculate distance between thumb and index finger tips
   const distance = calculateDistance(thumbTip, indexTip);
-  
-  // Close pinch for zoom out - fingers close together
   return distance < CLOSE_PINCH_THRESHOLD;
 };
 
 export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
-  const middlePIP = landmarks[10]; // middle finger PIP joint
+  const middlePIP = landmarks[10];
   
   if (!thumbTip || !indexTip || !middlePIP) return false;
   
-  // Calculate distance between thumb and index finger tips
   const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
-  
-  // Check if thumb is extended by measuring distance to middle finger PIP joint
-  // When thumb is extended, it's farther from middle PIP than when curled
   const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
   
   const thumbExtended = thumbMiddleDistance > THUMB_EXTENDED_THRESHOLD;
-  
-  // Open pinch: thumb and index spread apart, AND thumb is extended
   return thumbIndexDistance > OPEN_PINCH_THRESHOLD && thumbExtended;
 };
-
 
 export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   if (!landmarks || landmarks.length === 0) return { x: 0, y: 0, speed: 0, inDeadZone: true };
   
   const indexTip = landmarks[8];
   if (!indexTip) return { x: 0, y: 0, speed: 0, inDeadZone: true };
-  
   
   // Calculate vector from dead zone center to finger tip
   const vectorX = indexTip.x - DEAD_ZONE_CENTER.x;
@@ -90,15 +84,9 @@ export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   // Calculate normalized direction and speed
   const normalizedX = vectorX / distance;
   const normalizedY = vectorY / distance;
-  
-  // Implement inverted control (natural scrolling)
-  // Hand UP (negative Y) -> Map pans DOWN (positive Y)
-  // Hand DOWN (positive Y) -> Map pans UP (negative Y)
   const invertedY = -normalizedY;
   
   // Speed is proportional to distance from dead zone edge
-  // Since the coordinate system is normalized (0 to 1), 0.5 is the
-  // maximum distance you can be from the center (0.5, 0.5) to reach any edge.
   const speedFactor = Math.min(((distance - DEAD_ZONE_RADIUS) / (0.5 - DEAD_ZONE_RADIUS)) * PAN_SPEED_AMPLIFIER, 1.0);
   
   return {
