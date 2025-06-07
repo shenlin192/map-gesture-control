@@ -1,4 +1,4 @@
-import { GestureRecognizer, type NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { GestureRecognizer, type GestureRecognizerResult, type NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { EMASmoother } from '../components/EMASmoother'; // Assuming EMASmoother is here
 
 // Helper function to initialize EMASmoother instances for all hands
@@ -13,7 +13,7 @@ export function initializeEmaSmoothersForHands(maxHands: number, smoothingFactor
 export function recognizeGesturesInFrame(
   video: HTMLVideoElement,
   gestureRecognizer: GestureRecognizer
-) {
+): GestureRecognizerResult | null {
   try {
     const startTimeMs = performance.now();
     return gestureRecognizer.recognizeForVideo(video, startTimeMs);
@@ -24,7 +24,7 @@ export function recognizeGesturesInFrame(
 }
 
 export function getSmoothLandmarks(
-  results: any,
+  results: GestureRecognizerResult,
   landmarkSmoothers: EMASmoother[][],
   maxSupportedHands: number
 ): NormalizedLandmark[][] {
