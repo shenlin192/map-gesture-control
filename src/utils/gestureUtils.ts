@@ -1,11 +1,10 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER } from './constants';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD } from './constants';
 
 export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
 ): boolean => {
-  if (!landmarks || landmarks.length === 0) return false;
   const hand = landmarks;
   const idxT = hand[8],
     idxP = hand[6],
@@ -36,27 +35,48 @@ export const isIndexPointingUp = (
   return indexExtended && middleCurled && ringCurled && pinkyCurled;
 };
 
-export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
-  return false;
+export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+  
+  if (!thumbTip || !indexTip) return false;
+  
+  // Calculate distance between thumb and index finger tips
+  const distance = Math.sqrt(
+    Math.pow(thumbTip.x - indexTip.x, 2) + 
+    Math.pow(thumbTip.y - indexTip.y, 2)
+  );
+  
+  // Close pinch for zoom out - fingers close together
+  return distance < CLOSE_PINCH_THRESHOLD;
 };
 
-export const isOpenPalm = (landmarks: NormalizedLandmark[]): boolean => {
-  if (!landmarks || landmarks.length === 0) return false;
+export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+  const middlePIP = landmarks[10]; // middle finger PIP joint
   
-  const fingerTips = [8, 12, 16, 20];
-  const fingerBases = [6, 10, 14, 18];
+  if (!thumbTip || !indexTip || !middlePIP) return false;
   
-  for (let i = 0; i < fingerTips.length; i++) {
-    const tip = landmarks[fingerTips[i]];
-    const base = landmarks[fingerBases[i]];
-    
-    if (!tip || !base) return false;
-    
-    if (tip.y > base.y) return false;
-  }
+  // Calculate distance between thumb and index finger tips
+  const thumbIndexDistance = Math.sqrt(
+    Math.pow(thumbTip.x - indexTip.x, 2) + 
+    Math.pow(thumbTip.y - indexTip.y, 2)
+  );
   
-  return true;
+  // Check if thumb is extended by measuring distance to middle finger PIP joint
+  // When thumb is extended, it's farther from middle PIP than when curled
+  const thumbMiddleDistance = Math.sqrt(
+    Math.pow(thumbTip.x - middlePIP.x, 2) + 
+    Math.pow(thumbTip.y - middlePIP.y, 2)
+  );
+  
+  const thumbExtended = thumbMiddleDistance > THUMB_EXTENDED_THRESHOLD;
+  
+  // Open pinch: thumb and index spread apart, AND thumb is extended
+  return thumbIndexDistance > OPEN_PINCH_THRESHOLD && thumbExtended;
 };
+
 
 export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   if (!landmarks || landmarks.length === 0) return { x: 0, y: 0, speed: 0, inDeadZone: true };
@@ -100,15 +120,47 @@ export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   };
 };
 
+export const calculateZoomSpeed = (landmarks: NormalizedLandmark[]) => {
+  if (!landmarks || landmarks.length === 0) return { speed: 0, inDeadZone: true };
+  
+  // Use index finger tip position for zoom speed control (same as panning)
+  const indexTip = landmarks[8];
+  if (!indexTip) return { speed: 0, inDeadZone: true };
+  
+  // Calculate distance from dead zone center
+  const vectorX = indexTip.x - DEAD_ZONE_CENTER.x;
+  const vectorY = indexTip.y - DEAD_ZONE_CENTER.y;
+  const distance = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
+  
+  // Check if finger is in dead zone
+  if (distance <= DEAD_ZONE_RADIUS) {
+    return { speed: 0, inDeadZone: true };
+  }
+  
+  // Speed is proportional to distance from dead zone edge (same as panning)
+  const speedFactor = Math.min(((distance - DEAD_ZONE_RADIUS) / (0.5 - DEAD_ZONE_RADIUS)) * PAN_SPEED_AMPLIFIER, 1.0);
+  
+  return {
+    speed: speedFactor,
+    inDeadZone: false,
+    distance: distance.toFixed(3),
+    fingerPos: { x: indexTip.x.toFixed(3), y: indexTip.y.toFixed(3) }
+  };
+};
+
 export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode => {
   if (!landmarks || landmarks.length === 0) return 'IDLE';
   
-  if (isIndexPointingUp(landmarks)) {
-    return 'PANNING';
+  if (isClosePinchGesture(landmarks)) {
+    return 'ZOOM_OUT';
+  }
+  
+  if (isOpenPinchGesture(landmarks)) {
+    return 'ZOOM_IN';
   }
 
-  if (isPinchGesture(landmarks)) {
-    return 'ZOOMING';
+  if (isIndexPointingUp(landmarks)) {
+    return 'PANNING';
   }
   
   return 'IDLE';

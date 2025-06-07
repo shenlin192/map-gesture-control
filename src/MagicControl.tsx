@@ -3,6 +3,7 @@ import { EMASmoother } from './components/EMASmoother.ts';
 import ReactMap from './components/ReactMap.tsx';
 import CameraView from './components/Camera.tsx';
 import PanVectorInfo from './components/PanVectorInfo.tsx';
+import ZoomVectorInfo from './components/ZoomVectorInfo.tsx';
 import ControlStatus from './components/ControlStatus.tsx';
 import type { MapRef } from 'react-map-gl/mapbox';
 import { useMediaPipe } from './hooks/useMediaPipe';
@@ -15,7 +16,7 @@ import {
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
 import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
-import { detectControlMode, calculatePanVector } from './utils/gestureUtils';
+import { detectControlMode, calculatePanVector, calculateZoomSpeed } from './utils/gestureUtils';
 import type { ControlMode } from './types';
 
 const MAX_SUPPORTED_HANDS = 2;
@@ -31,6 +32,7 @@ function MagicControl() {
   const [currentControlMode, setCurrentControlMode] = useState<ControlMode>('IDLE');
   const [detectedGesture, setDetectedGesture] = useState<string>('None');
   const [panVector, setPanVector] = useState<any>(null);
+  const [zoomVector, setZoomVector] = useState<any>(null);
 
   const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
   const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
@@ -71,7 +73,7 @@ function MagicControl() {
       landmarkSmootherRef.current,
       MAX_SUPPORTED_HANDS
     );
-
+    
      // Draw canvas with landmarks
      drawLandmarksOnCanvas(
       canvasRef.current!,
@@ -88,13 +90,28 @@ function MagicControl() {
       setCurrentControlMode(controlMode);
       
       switch (controlMode) {
-        case 'ZOOMING':
-          setDetectedGesture('Pinch - Zoom Mode');
+        case 'ZOOM_IN':
+        case 'ZOOM_OUT':
+          const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
+          const zoomVec = {
+            direction: controlMode,
+            ...zoomSpeedInfo
+          };
+          setZoomVector(zoomVec);
           setPanVector(null);
+          drawDeadZone(canvasRef.current!);
+          
+          if (zoomVec.inDeadZone) {
+            setDetectedGesture(`${controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch'} - In Dead Zone`);
+          } else {
+            const speedPercentage = (zoomVec.speed * 100).toFixed(0).padStart(3, ' ');
+            setDetectedGesture(`${controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch'} - ${controlMode.replace('_', ' ')} (Speed: ${speedPercentage}%)`);
+          }
           break;
         case 'PANNING':
           const panVec = calculatePanVector(primaryHand);
           setPanVector(panVec);
+          setZoomVector(null);
           drawDeadZone(canvasRef.current!); 
           if (panVec.inDeadZone) {
             setDetectedGesture('Pointing Up - In Dead Zone');
@@ -106,15 +123,18 @@ function MagicControl() {
         case 'IDLE':
           setDetectedGesture('Open Palm/Other - Idle');
           setPanVector(null);
+          setZoomVector(null);
           break;
         default:
           setDetectedGesture('Unknown');
           setPanVector(null);
+          setZoomVector(null);
       }
     } else {
       setCurrentControlMode('IDLE');
       setDetectedGesture('No hand detected');
       setPanVector(null);
+      setZoomVector(null);
     }
 
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
@@ -155,6 +175,7 @@ function MagicControl() {
         <div className="w-full md:w-1/3 flex flex-col items-center gap-3">
           <CameraView videoRef={videoRef} canvasRef={canvasRef} />
           <PanVectorInfo panVector={panVector} />
+          <ZoomVectorInfo zoomVector={zoomVector} />
         </div>
       </div>
     </div>

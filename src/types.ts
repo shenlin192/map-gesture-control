@@ -5,7 +5,7 @@ export type GestureType =
   | 'PANNING_POINTING_UP'
   | 'PANNING_CUSTOM';
 
-export type ControlMode = 'PANNING' | 'ZOOMING' | 'IDLE';
+export type ControlMode = 'PANNING' | 'ZOOM_IN' | 'ZOOM_OUT' | 'IDLE';
 
 export type GestureStatus =
   | 'Initializing Map...'
