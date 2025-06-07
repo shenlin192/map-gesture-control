@@ -13,14 +13,9 @@ export function initializeEmaSmoothersForHands(maxHands: number, smoothingFactor
 export function recognizeGesturesInFrame(
   video: HTMLVideoElement,
   gestureRecognizer: GestureRecognizer
-): GestureRecognizerResult | null {
-  try {
-    const startTimeMs = performance.now();
-    return gestureRecognizer.recognizeForVideo(video, startTimeMs);
-  } catch (err) {
-    console.error('Error in recognizeGesturesInFrame:', err);
-    return null;
-  }
+): GestureRecognizerResult {
+  const startTimeMs = performance.now();
+  return gestureRecognizer.recognizeForVideo(video, startTimeMs);
 }
 
 export function getSmoothLandmarks(
