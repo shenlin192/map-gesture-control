@@ -1,4 +1,5 @@
 import { DrawingUtils, GestureRecognizer, type NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS } from './constants';
 
 // Helper function to draw all detected and smoothed hands on the canvas
 export function drawHandsOnCanvas(
@@ -29,15 +30,11 @@ export function drawDeadZone(canvas: HTMLCanvasElement) {
     console.error('drawDeadZone: Failed to get 2D context from canvas.');
     return;
   }
-
-  const deadZoneCenter = { x: 0.5, y: 0.5 };
-  const deadZoneRadius = 0.15;
   
   // Convert normalized coordinates to canvas coordinates
-  const centerX = deadZoneCenter.x * canvas.width;
-  const centerY = deadZoneCenter.y * canvas.height;
-  const radius = deadZoneRadius * Math.min(canvas.width, canvas.height);
-  
+  const centerX = DEAD_ZONE_CENTER.x * canvas.width;
+  const centerY = DEAD_ZONE_CENTER.y * canvas.height;
+  const radius = DEAD_ZONE_RADIUS * Math.min(canvas.width, canvas.height);
   
   canvasCtx.save();
   

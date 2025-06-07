@@ -1,5 +1,6 @@
 import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER } from './constants';
 
 export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
@@ -63,17 +64,14 @@ export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   const indexTip = landmarks[8];
   if (!indexTip) return { x: 0, y: 0, speed: 0, inDeadZone: true };
   
-  // Define dead zone center and radius
-  const deadZoneCenter = { x: 0.5, y: 0.5 };
-  const deadZoneRadius = 0.15;
   
   // Calculate vector from dead zone center to finger tip
-  const vectorX = indexTip.x - deadZoneCenter.x;
-  const vectorY = indexTip.y - deadZoneCenter.y;
+  const vectorX = indexTip.x - DEAD_ZONE_CENTER.x;
+  const vectorY = indexTip.y - DEAD_ZONE_CENTER.y;
   const distance = Math.sqrt(vectorX * vectorX + vectorY * vectorY);
   
   // Check if finger is in dead zone
-  if (distance <= deadZoneRadius) {
+  if (distance <= DEAD_ZONE_RADIUS) {
     return { x: 0, y: 0, speed: 0, inDeadZone: true };
   }
   
@@ -87,7 +85,9 @@ export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   const invertedY = -normalizedY;
   
   // Speed is proportional to distance from dead zone edge
-  const speedFactor = Math.min((distance - deadZoneRadius) / (0.5 - deadZoneRadius), 1.0);
+  // Since the coordinate system is normalized (0 to 1), 0.5 is the
+  // maximum distance you can be from the center (0.5, 0.5) to reach any edge.
+  const speedFactor = Math.min(((distance - DEAD_ZONE_RADIUS) / (0.5 - DEAD_ZONE_RADIUS)) * PAN_SPEED_AMPLIFIER, 1.0);
   
   return {
     x: normalizedX,
