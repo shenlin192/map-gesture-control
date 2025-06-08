@@ -55,15 +55,18 @@ export const isIndexPointingUp = (
   return true;
 };
 
+// TODO: stricter conditions 
 export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
   if (!landmarks || landmarks.length === 0) return false;
   
+  const wrist = landmarks[0];
   const thumbTip = landmarks[4];
   const thumbIP = landmarks[3];
   const thumbMCP = landmarks[2];
   const indexPIP = landmarks[6];
   const indexDIP = landmarks[7];
   const indexTip = landmarks[8];
+  const middleMCP = landmarks[9];
   const middlePIP = landmarks[10];
   
   // Check if all required landmarks exist
@@ -73,11 +76,18 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   
   // 1. Thumb and index tips must be close together
   const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
+  // replace it with Ratio
   if (thumbIndexDistance >= CLOSE_PINCH_THRESHOLD) return false;
   
   // 2. Index finger must be curled
   const indexCurled = indexTip.y > indexDIP.y && indexDIP.y > indexPIP.y;
   if (!indexCurled) return false;
+
+  // 3. thumb and index to middle finger distance related to the wist to middle finger distance
+  const wristMiddleDistance = calculateDistance(wrist, middleMCP);
+  const indexMiddleDistance = calculateDistance(indexTip, middleMCP);
+  const indexMiddleDistanceRatio = indexMiddleDistance / wristMiddleDistance;
+  if (indexMiddleDistanceRatio < 0.58) return false;
   
   return true;
 };
@@ -98,7 +108,6 @@ export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
   
   // 1. Thumb and index must be spread apart at sufficient angle
   const thumbIndexAngle = calculateAngle(thumbMCP, thumbTip, indexTip);
-  console.log('thumbIndexAngle', thumbIndexAngle);
 
   if (thumbIndexAngle < VICTORY_ANGLE_THRESHOLD) return false;
   
@@ -208,12 +217,10 @@ export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], r
   if (smoothedLandmarks.length === 0) return defaultGestureState;
 
   const categoryName = results.gestures[0][0].categoryName;
-  console.log('categoryName', categoryName);
   const primaryHandLandmarks = smoothedLandmarks[0];
 
+  // TODO: debounce controlMode
   const controlMode = detectControlMode(primaryHandLandmarks, categoryName);
-
-  console.log('controlMode', controlMode);
   
   switch (controlMode) {
     case 'ZOOM_IN':
