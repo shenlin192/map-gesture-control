@@ -10,9 +10,11 @@ interface PanVector {
 }
 
 interface ZoomVector {
-  zoomDelta: number;
+  direction: 'ZOOM_IN' | 'ZOOM_OUT';
   speed: number;
-  isActive: boolean;
+  inDeadZone: boolean;
+  distance: string;
+  fingerPos: { x: string; y: string };
 }
 
 interface UseMapControlProps {
@@ -33,8 +35,9 @@ const shouldControlMap = (
   switch (controlMode) {
     case 'PANNING':
       return panVector && !panVector.inDeadZone;
-    case 'ZOOMING':
-      return zoomVector && zoomVector.isActive;
+    case 'ZOOM_IN':
+    case 'ZOOM_OUT':
+      return zoomVector && !zoomVector.inDeadZone;
     default:
       return false;
   }
@@ -54,11 +57,15 @@ const calculateMapAction = (
       const moveY = panVector.y * panVector.speed * baseSpeed * (deltaTime / 1000);
       return { type: 'pan' as const, moveX, moveY };
       
-    case 'ZOOMING':
+    case 'ZOOM_IN':
+    case 'ZOOM_OUT':
       if (!zoomVector) return null;
-      const zoomSpeed = 2; // zoom units per second
-      const zoomChange = zoomVector.zoomDelta * zoomVector.speed * zoomSpeed * (deltaTime / 1000);
-      return { type: 'zoom' as const, zoomChange };
+      const zoomBaseSpeed = 2.0; // zoom levels per second at full speed
+      // Close pinch (ZOOM_OUT) should zoom IN (fingers coming together = getting closer)
+      // Open pinch (ZOOM_IN) should zoom OUT (fingers spreading = getting farther)  
+      const zoomDirection = controlMode === 'ZOOM_OUT' ? 1 : -1;
+      const zoomDelta = zoomDirection * zoomVector.speed * zoomBaseSpeed * (deltaTime / 1000);
+      return { type: 'zoom' as const, zoomDelta };
       
     default:
       return null;
@@ -74,9 +81,11 @@ const applyMapAction = (map: any, action: ReturnType<typeof calculateMapAction>)
       case 'pan':
         map.panBy([action.moveX, action.moveY], { duration: 0 });
         break;
+      
       case 'zoom':
         const currentZoom = map.getZoom();
-        map.setZoom(currentZoom + action.zoomChange);
+        const newZoom = Math.max(0, Math.min(22, currentZoom + action.zoomDelta)); // Clamp between 0-22
+        map.setZoom(newZoom, { duration: 0 });
         break;
     }
   } catch (err) {

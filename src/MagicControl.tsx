@@ -44,6 +44,7 @@ function MagicControl() {
     mapRef,
     controlMode: currentControlMode,
     panVector,
+    zoomVector,
   });
 
   const predictWebcamLoop: () => void = useCallback(() => {
