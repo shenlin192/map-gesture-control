@@ -207,20 +207,36 @@ export const detectControlMode = (landmarks: NormalizedLandmark[], categoryName:
   return 'IDLE';
 };
 
-const defaultGestureState = {
-  controlMode: 'IDLE' as ControlMode,
-  panVector: null,
-  zoomVector: null,
-}
-
 export const getControlMode = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult): ControlMode => {
   if (smoothedLandmarks.length === 0) return 'IDLE';
 
   const categoryName = results.gestures[0][0].categoryName;
   const primaryHandLandmarks = smoothedLandmarks[0];
 
-  // TODO: debounce controlMode
   return detectControlMode(primaryHandLandmarks, categoryName);
+};
+
+export const getDebouncedControlMode = (
+  detectedMode: ControlMode,
+  currentMode: ControlMode,
+  historyRef: { current: ControlMode[] },
+  debounceFrames: number = 3
+): ControlMode => {
+  // Add to history
+  historyRef.current.push(detectedMode);
+  if (historyRef.current.length > debounceFrames) {
+    historyRef.current.shift();
+  }
+  
+  // Check if we have enough consecutive frames of the same mode
+  if (historyRef.current.length >= debounceFrames) {
+    const allSame = historyRef.current.every(mode => mode === detectedMode);
+    if (allSame && currentMode !== detectedMode) {
+      return detectedMode;
+    }
+  }
+  
+  return currentMode;
 };
 
 export const getGestureVectors = (controlMode: ControlMode, smoothedLandmarks: NormalizedLandmark[][]) => {

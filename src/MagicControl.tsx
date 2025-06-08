@@ -16,7 +16,7 @@ import {
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
 import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
-import { getControlMode, getGestureVectors } from './utils/gestureUtils';
+import { getControlMode, getDebouncedControlMode, getGestureVectors } from './utils/gestureUtils';
 import type { ControlMode } from './types';
 import { MAX_SUPPORTED_HANDS } from './constants.ts';
 
@@ -31,6 +31,9 @@ function MagicControl() {
   const [currentControlMode, setCurrentControlMode] = useState<ControlMode>('IDLE');
   const [panVector, setPanVector] = useState<any>(null);
   const [zoomVector, setZoomVector] = useState<any>(null);
+  
+  const controlModeHistoryRef = useRef<ControlMode[]>([]);
+  const DEBOUNCE_FRAMES = 3;
 
   const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
   const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
@@ -79,12 +82,21 @@ function MagicControl() {
     );
     drawDeadZone(canvasRef.current!);
 
-    // step 4: detect control mode
-    const controlMode = getControlMode(smoothedLandmarks, results);
-    setCurrentControlMode(controlMode);
+    // step 4: detect control mode with debouncing
+    const detectedMode = getControlMode(smoothedLandmarks, results);
+    const debouncedMode = getDebouncedControlMode(
+      detectedMode,
+      currentControlMode,
+      controlModeHistoryRef,
+      DEBOUNCE_FRAMES
+    );
     
-    // step 5: calculate gesture vectors
-    const gestureVectors = getGestureVectors(controlMode, smoothedLandmarks);
+    if (debouncedMode !== currentControlMode) {
+      setCurrentControlMode(debouncedMode);
+    }
+    
+    // step 5: calculate gesture vectors using debounced mode
+    const gestureVectors = getGestureVectors(debouncedMode, smoothedLandmarks);
     setPanVector(gestureVectors.panVector);
     setZoomVector(gestureVectors.zoomVector);    
     
@@ -96,6 +108,7 @@ function MagicControl() {
   useEffect(() => {
     if (isWebcamReady) {
       landmarkSmootherRef.current = initializeEmaSmoothersForHands(MAX_SUPPORTED_HANDS, 0.5);
+      controlModeHistoryRef.current = []; // Reset debounce history
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
       requestRef.current = requestAnimationFrame(predictWebcamLoop);
     }
