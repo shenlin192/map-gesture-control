@@ -3,44 +3,56 @@ import type { ControlMode } from '../types';
 import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD, THUMB_CURL_THRESHOLD } from './constants';
 import { calculateDistance } from './geometry';
 
+// Helper function to check if middle, ring, and pinky fingers are curled
+const areFingersCurled = (landmarks: NormalizedLandmark[], tolerance: number = 0): boolean => {
+  const middleTip = landmarks[12];
+  const middlePIP = landmarks[10];
+  const ringTip = landmarks[16];
+  const ringPIP = landmarks[14];
+  const pinkyTip = landmarks[20];
+  const pinkyPIP = landmarks[18];
+  
+  if (!middleTip || !middlePIP || !ringTip || !ringPIP || !pinkyTip || !pinkyPIP) {
+    return false;
+  }
+  
+  const middleCurled = middleTip.y > middlePIP.y - tolerance;
+  const ringCurled = ringTip.y > ringPIP.y - tolerance;
+  const pinkyCurled = pinkyTip.y > pinkyPIP.y - tolerance;
+  
+  return middleCurled && ringCurled && pinkyCurled;
+};
+
 export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
 ): boolean => {
-  const hand = landmarks;
-  const idxT = hand[8],
-    idxP = hand[6],
-    idxM = hand[5];
-  const midT = hand[12],
-    midP = hand[10];
-  const rngT = hand[16],
-    rngP = hand[14];
-  const pkyT = hand[20],
-    pkyP = hand[18];
-  if (
-    !idxT ||
-    !idxP ||
-    !idxM ||
-    !midT ||
-    !midP ||
-    !rngT ||
-    !rngP ||
-    !pkyT ||
-    !pkyP
-  )
-    return false;
+  if (!landmarks || landmarks.length === 0) return false;
   
-  const thumbTip = hand[4];
-  const middlePIP = hand[10];
-
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+  const indexPIP = landmarks[6];
+  const indexMCP = landmarks[5];
+  const middlePIP = landmarks[10];
+  
+  // Check if all required landmarks exist
+  if (!thumbTip || !indexTip || !indexPIP || !indexMCP || !middlePIP) {
+    return false;
+  }
+  
+  // 1. Index finger must be extended (tip above PIP above MCP)
+  const indexExtended = indexTip.y < indexPIP.y && indexPIP.y < indexMCP.y;
+  if (!indexExtended) return false;
+  
+  // 2. Thumb must be curled (close to middle finger PIP)
   const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
   const thumbCurled = thumbMiddleDistance < THUMB_CURL_THRESHOLD;
-  const indexExtended = idxT.y < idxP.y && idxP.y < idxM.y;
-  const yTol = 0.04;
-  const middleCurled = midT.y > midP.y - yTol;
-  const ringCurled = rngT.y > rngP.y - yTol;
-  const pinkyCurled = pkyT.y > pkyP.y - yTol;
+  if (!thumbCurled) return false;
+  
+  // 3. Middle, ring, and pinky fingers must be curled (with tolerance)
+  const fingersCurled = areFingersCurled(landmarks, 0.04);
+  if (!fingersCurled) return false;
 
-  return indexExtended && middleCurled && ringCurled && pinkyCurled && thumbCurled;
+  return true;
 };
 
 export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
@@ -52,17 +64,31 @@ export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean =>
 };
 
 export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
+  if (!landmarks || landmarks.length === 0) return false;
+  
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
   const middlePIP = landmarks[10];
   
-  if (!thumbTip || !indexTip || !middlePIP) return false;
+  // Check if all required landmarks exist
+  if (!thumbTip || !indexTip || !middlePIP) {
+    return false;
+  }
   
+  // 1. Thumb and index must be spread apart
   const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
-  const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
+  if (thumbIndexDistance <= OPEN_PINCH_THRESHOLD) return false;
   
+  // 2. Thumb must be extended (not curled)
+  const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
   const thumbExtended = thumbMiddleDistance > THUMB_EXTENDED_THRESHOLD;
-  return thumbIndexDistance > OPEN_PINCH_THRESHOLD && thumbExtended;
+  if (!thumbExtended) return false;
+  
+  // 3. Middle, ring, and pinky fingers must be curled (strict)
+  const fingersCurled = areFingersCurled(landmarks);
+  if (!fingersCurled) return false;
+  
+  return true;
 };
 
 export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
