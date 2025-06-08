@@ -61,8 +61,6 @@ const calculateMapAction = (
     case 'ZOOM_OUT':
       if (!zoomVector) return null;
       const zoomBaseSpeed = 2.0; // zoom levels per second at full speed
-      // Close pinch (ZOOM_OUT) should zoom IN (fingers coming together = getting closer)
-      // Open pinch (ZOOM_IN) should zoom OUT (fingers spreading = getting farther)  
       const zoomDirection = controlMode === 'ZOOM_OUT' ? 1 : -1;
       const zoomDelta = zoomDirection * zoomVector.speed * zoomBaseSpeed * (deltaTime / 1000);
       return { type: 'zoom' as const, zoomDelta };

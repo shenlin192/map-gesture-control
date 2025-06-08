@@ -58,7 +58,7 @@ export default function ControlStatus({ currentControlMode, panVector, zoomVecto
           </div>
           <div>
             <span className="font-semibold">Gesture: </span>
-            <span className="text-yellow-300">{detectedGesture}</span>
+            <span className="text-yellow-300 font-mono">{detectedGesture}</span>
           </div>
         </div>
       </div>
