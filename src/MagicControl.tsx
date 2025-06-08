@@ -81,7 +81,7 @@ function MagicControl() {
     drawDeadZone(canvasRef.current!);
     
     // step 4: deduce user intent 
-    const gestureState = processGestureState(smoothedLandmarks);
+    const gestureState = processGestureState(smoothedLandmarks, results);
     setCurrentControlMode(gestureState.controlMode);
     setPanVector(gestureState.panVector);
     setZoomVector(gestureState.zoomVector);

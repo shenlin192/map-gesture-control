@@ -1,7 +1,7 @@
-import type { NormalizedLandmark } from '@mediapipe/tasks-vision';
+import type { GestureRecognizerResult, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD, THUMB_CURL_THRESHOLD } from './constants';
-import { calculateDistance } from './geometry';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD, THUMB_CURL_THRESHOLD, OPEN_PINCH_ANGLE_THRESHOLD } from './constants';
+import { calculateDistance, calculateAngle } from './geometry';
 
 // Helper function to check if middle, ring, and pinky fingers are curled
 const areFingersCurled = (landmarks: NormalizedLandmark[], tolerance: number = 0): boolean => {
@@ -66,25 +66,21 @@ export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean =>
 export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
   
+  const wrist = landmarks[0];
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
   const middlePIP = landmarks[10];
   
   // Check if all required landmarks exist
-  if (!thumbTip || !indexTip || !middlePIP) {
+  if (!wrist || !thumbTip || !indexTip || !middlePIP) {
     return false;
   }
   
-  // 1. Thumb and index must be spread apart
-  const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
-  if (thumbIndexDistance <= OPEN_PINCH_THRESHOLD) return false;
+  // 1. Thumb and index must be spread apart at sufficient angle
+  const thumbIndexAngle = calculateAngle(wrist, thumbTip, indexTip);
+  if (thumbIndexAngle < OPEN_PINCH_ANGLE_THRESHOLD) return false;
   
-  // 2. Thumb must be extended (not curled)
-  const thumbMiddleDistance = calculateDistance(thumbTip, middlePIP);
-  const thumbExtended = thumbMiddleDistance > THUMB_EXTENDED_THRESHOLD;
-  if (!thumbExtended) return false;
-  
-  // 3. Middle, ring, and pinky fingers must be curled (strict)
+  // 2. Middle, ring, and pinky fingers must be curled (strict)
   const fingersCurled = areFingersCurled(landmarks);
   if (!fingersCurled) return false;
   
@@ -172,7 +168,7 @@ export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode 
   return 'IDLE';
 };
 
-export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][]) => {
+export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult) => {
   if (smoothedLandmarks.length === 0) {
     return {
       controlMode: 'IDLE' as ControlMode,
