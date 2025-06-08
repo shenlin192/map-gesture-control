@@ -20,7 +20,7 @@ const generateGestureText = (controlMode: ControlMode, panVector: any, zoomVecto
   if (controlMode === 'ZOOM_IN' || controlMode === 'ZOOM_OUT') {
     if (!zoomVector) return 'Unknown';
     
-    const gestureLabel = controlMode === 'ZOOM_IN' ? 'Open Pinch' : 'Close Pinch';
+    const gestureLabel = controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch';
     if (zoomVector.inDeadZone) {
       return `${gestureLabel} - In Dead Zone`;
     }

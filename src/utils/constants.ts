@@ -14,5 +14,4 @@ export const MAX_ZOOM_SPEED = 1.0;
 
 // Gesture detection thresholds
 export const CLOSE_PINCH_THRESHOLD = 0.15;
-export const OPEN_PINCH_THRESHOLD = 0.3;
-export const OPEN_PINCH_ANGLE_THRESHOLD = 35; // degrees
+export const VICTORY_ANGLE_THRESHOLD = 35; // degrees

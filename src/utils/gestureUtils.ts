@@ -1,6 +1,6 @@
 import type { GestureRecognizerResult, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, OPEN_PINCH_THRESHOLD, THUMB_EXTENDED_THRESHOLD, THUMB_CURL_THRESHOLD, OPEN_PINCH_ANGLE_THRESHOLD } from './constants';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, THUMB_CURL_THRESHOLD, VICTORY_ANGLE_THRESHOLD } from './constants';
 import { calculateDistance, calculateAngle } from './geometry';
 
 // Helper function to check if middle, ring, and pinky fingers are curled
@@ -63,22 +63,21 @@ export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean =>
   return distance < CLOSE_PINCH_THRESHOLD;
 };
 
-export const isOpenPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
+export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
   
   const wrist = landmarks[0];
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
-  const middlePIP = landmarks[10];
   
   // Check if all required landmarks exist
-  if (!wrist || !thumbTip || !indexTip || !middlePIP) {
+  if (!wrist || !thumbTip || !indexTip) {
     return false;
   }
   
   // 1. Thumb and index must be spread apart at sufficient angle
   const thumbIndexAngle = calculateAngle(wrist, thumbTip, indexTip);
-  if (thumbIndexAngle < OPEN_PINCH_ANGLE_THRESHOLD) return false;
+  if (thumbIndexAngle < VICTORY_ANGLE_THRESHOLD) return false;
   
   // 2. Middle, ring, and pinky fingers must be curled (strict)
   const fingersCurled = areFingersCurled(landmarks);
@@ -157,7 +156,7 @@ export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode 
     return 'ZOOM_OUT';
   }
   
-  if (isOpenPinchGesture(landmarks)) {
+  if (isVictoryGesture(landmarks)) {
     return 'ZOOM_IN';
   }
 
