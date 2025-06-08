@@ -33,7 +33,7 @@ function MagicControl() {
   const [zoomVector, setZoomVector] = useState<any>(null);
   
   const controlModeHistoryRef = useRef<ControlMode[]>([]);
-  const DEBOUNCE_FRAMES = 3;
+  const DEBOUNCE_FRAMES = 10;
 
   const { gestureRecognizerRef, isMediaPipeReady } = useMediaPipe();
   const { drawingUtilsRef, isDrawingUtilsReady } = useCanvasSetup({ canvasRef, isReady: isMediaPipeReady });
