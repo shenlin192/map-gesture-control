@@ -14,7 +14,7 @@ const formatSpeedPercentage = (speed: number): string => {
 // Helper function to generate gesture text based on control mode and state
 const generateGestureText = (controlMode: ControlMode, panVector: any, zoomVector: any): string => {
   if (controlMode === 'IDLE') {
-    return panVector || zoomVector ? 'Open Palm/Other - Idle' : 'No hand detected';
+    return 'Idle';
   }
 
   if (controlMode === 'ZOOM_IN' || controlMode === 'ZOOM_OUT') {

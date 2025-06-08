@@ -1,6 +1,6 @@
 import type { GestureRecognizerResult, NormalizedLandmark } from '@mediapipe/tasks-vision';
 import type { ControlMode } from '../types';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, THUMB_CURL_THRESHOLD, VICTORY_ANGLE_THRESHOLD } from './constants';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, THUMB_CURL_THRESHOLD, VICTORY_ANGLE_THRESHOLD } from '../constants';
 import { calculateDistance, calculateAngle } from './geometry';
 
 // Helper function to check if middle, ring, and pinky fingers are curled
@@ -213,14 +213,22 @@ const defaultGestureState = {
   zoomVector: null,
 }
 
-export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult) => {
-  if (smoothedLandmarks.length === 0) return defaultGestureState;
+export const getControlMode = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult): ControlMode => {
+  if (smoothedLandmarks.length === 0) return 'IDLE';
 
   const categoryName = results.gestures[0][0].categoryName;
   const primaryHandLandmarks = smoothedLandmarks[0];
 
   // TODO: debounce controlMode
-  const controlMode = detectControlMode(primaryHandLandmarks, categoryName);
+  return detectControlMode(primaryHandLandmarks, categoryName);
+};
+
+export const getGestureVectors = (controlMode: ControlMode, smoothedLandmarks: NormalizedLandmark[][]) => {
+  if (smoothedLandmarks.length === 0) {
+    return { panVector: null, zoomVector: null };
+  }
+
+  const primaryHandLandmarks = smoothedLandmarks[0];
   
   switch (controlMode) {
     case 'ZOOM_IN':
@@ -232,7 +240,6 @@ export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], r
       };
       
       return {
-        controlMode,
         panVector: null,
         zoomVector: zoomVec,
       };
@@ -241,14 +248,12 @@ export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], r
       const panVec = calculatePanVector(primaryHandLandmarks);
       
       return {
-        controlMode,
         panVector: panVec,
         zoomVector: null,
       };
 
     default: // 'IDLE' and unknown cases
       return {
-        controlMode,
         panVector: null,
         zoomVector: null,
       };

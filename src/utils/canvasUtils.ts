@@ -1,5 +1,5 @@
 import { DrawingUtils, GestureRecognizer, type NormalizedLandmark } from '@mediapipe/tasks-vision';
-import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS } from './constants';
+import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS } from '../constants';
 
 // Helper function to draw all detected and smoothed hands on the canvas
 export function drawHandsOnCanvas(

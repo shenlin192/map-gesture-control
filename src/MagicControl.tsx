@@ -16,9 +16,9 @@ import {
   initializeEmaSmoothersForHands,
 } from './utils/handTrackingUtils';
 import { drawLandmarksOnCanvas, drawDeadZone } from './utils/canvasUtils';
-import { processGestureState } from './utils/gestureUtils';
+import { getControlMode, getGestureVectors } from './utils/gestureUtils';
 import type { ControlMode } from './types';
-import { MAX_SUPPORTED_HANDS } from './utils/constants';
+import { MAX_SUPPORTED_HANDS } from './constants.ts';
 
 function MagicControl() {
   const mapComponentContainerRef = useRef<HTMLDivElement>(null);
@@ -77,14 +77,16 @@ function MagicControl() {
       drawingUtilsRef.current!,
       smoothedLandmarks,
     );
-    // TODO: no need to draw dead zone for each frame
     drawDeadZone(canvasRef.current!);
+
+    // step 4: detect control mode
+    const controlMode = getControlMode(smoothedLandmarks, results);
+    setCurrentControlMode(controlMode);
     
-    // step 4: deduce user intent 
-    const gestureState = processGestureState(smoothedLandmarks, results);
-    setCurrentControlMode(gestureState.controlMode);
-    setPanVector(gestureState.panVector);
-    setZoomVector(gestureState.zoomVector);
+    // step 5: calculate gesture vectors
+    const gestureVectors = getGestureVectors(controlMode, smoothedLandmarks);
+    setPanVector(gestureVectors.panVector);
+    setZoomVector(gestureVectors.zoomVector);    
     
     requestRef.current = requestAnimationFrame(predictWebcamLoop);
   }, [gestureRecognizerRef, drawingUtilsRef, videoRef, canvasRef, landmarkSmootherRef]);
