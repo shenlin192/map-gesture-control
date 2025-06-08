@@ -1,4 +1,4 @@
-import { DrawingUtils, GestureRecognizer, type NormalizedLandmark } from '@mediapipe/tasks-vision';
+import { GestureRecognizer, type GestureRecognizerResult, type NormalizedLandmark } from '@mediapipe/tasks-vision';
 import { EMASmoother } from '../components/EMASmoother'; // Assuming EMASmoother is here
 
 // Helper function to initialize EMASmoother instances for all hands
@@ -10,18 +10,26 @@ export function initializeEmaSmoothersForHands(maxHands: number, smoothingFactor
     );
 }
 
-// Helper function to apply smoothing to landmarks for all detected hands
-export function getSmoothedLandmarksForFrame(
-  rawLandmarksForHands: NormalizedLandmark[][],
-  handSmoothers: EMASmoother[][],
+export function recognizeGesturesInFrame(
+  video: HTMLVideoElement,
+  gestureRecognizer: GestureRecognizer
+): GestureRecognizerResult {
+  const startTimeMs = performance.now();
+  return gestureRecognizer.recognizeForVideo(video, startTimeMs);
+}
+
+export function getSmoothLandmarks(
+  results: GestureRecognizerResult,
+  landmarkSmoothers: EMASmoother[][],
   maxSupportedHands: number
 ): NormalizedLandmark[][] {
-  if (!rawLandmarksForHands || rawLandmarksForHands.length === 0) {
+  if (!results?.landmarks || landmarkSmoothers.length === 0) {
     return [];
   }
-  return rawLandmarksForHands.map((handLandmarks, handIndex) => {
+  
+  return results.landmarks.map((handLandmarks: NormalizedLandmark[], handIndex: number) => {
     if (handIndex >= maxSupportedHands) return handLandmarks; // Safety check
-    const currentHandSmoothers = handSmoothers[handIndex];
+    const currentHandSmoothers = landmarkSmoothers[handIndex];
     if (!currentHandSmoothers) return handLandmarks; // Safety check
 
     return handLandmarks.map((lm, landmarkIdx) =>
@@ -30,69 +38,4 @@ export function getSmoothedLandmarksForFrame(
   });
 }
 
-// Helper function to draw all detected and smoothed hands on the canvas
-export function drawHandsOnCanvas(
-  drawingUtils: DrawingUtils,
-  landmarksForHands: NormalizedLandmark[][]
-) {
-  landmarksForHands.forEach((singleHandLandmarks) => {
-    drawingUtils.drawConnectors(
-      singleHandLandmarks,
-      GestureRecognizer.HAND_CONNECTIONS,
-      { color: '#FFFFFF', lineWidth: 3 } // White connectors
-    );
-    drawingUtils.drawLandmarks(singleHandLandmarks, {
-      color: '#FF9800', // Orange landmarks
-      fillColor: '#FF9800',
-      lineWidth: 1,
-      radius: (data: any) => {
-        // Adjust landmark size based on Z-depth
-        return DrawingUtils.lerp(data.from!.z!, -0.15, 0.1, 5, 1);
-      },
-    });
-  });
-}
 
-export function processFrameAndDrawHands(
-  canvas: HTMLCanvasElement,
-  video: HTMLVideoElement,
-  gestureRecognizer: GestureRecognizer,
-  drawingUtils: DrawingUtils,
-  landmarkSmoothers: EMASmoother[][],
-  maxSupportedHands: number,
-) {
-  const canvasCtx = canvas.getContext('2d');
-  if (!canvasCtx) {
-    console.error('processFrameAndDrawHands: Failed to get 2D context from canvas.');
-    return;
-  }
-
-  try {
-    const startTimeMs = performance.now();
-    const results = gestureRecognizer.recognizeForVideo(video, startTimeMs);
-
-    canvasCtx.save();
-    canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (video.videoWidth > 0 && video.videoHeight > 0) {
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-      }
-    }
-
-    if (results?.landmarks && landmarkSmoothers.length > 0) {
-      const smoothedLandmarks = getSmoothedLandmarksForFrame(
-        results.landmarks,
-        landmarkSmoothers,
-        maxSupportedHands,
-      );
-      if (smoothedLandmarks.length > 0) {
-        drawHandsOnCanvas(drawingUtils, smoothedLandmarks);
-      }
-    }
-    canvasCtx.restore();
-  } catch (err) {
-    console.error('Error in processFrameAndDrawHands:', err);
-  }
-}
