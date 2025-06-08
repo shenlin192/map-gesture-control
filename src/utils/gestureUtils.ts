@@ -55,28 +55,51 @@ export const isIndexPointingUp = (
   return true;
 };
 
-export const isClosePinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
+export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
+  if (!landmarks || landmarks.length === 0) return false;
+  
   const thumbTip = landmarks[4];
+  const thumbIP = landmarks[3];
+  const thumbMCP = landmarks[2];
+  const indexPIP = landmarks[6];
+  const indexDIP = landmarks[7];
   const indexTip = landmarks[8];
-  if (!thumbTip || !indexTip) return false;
-  const distance = calculateDistance(thumbTip, indexTip);
-  return distance < CLOSE_PINCH_THRESHOLD;
+  const middlePIP = landmarks[10];
+  
+  // Check if all required landmarks exist
+  if (!thumbTip || !thumbIP || !thumbMCP || !indexTip || !indexPIP || !indexDIP || !middlePIP) {
+    return false;
+  }
+  
+  // 1. Thumb and index tips must be close together
+  const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
+  if (thumbIndexDistance >= CLOSE_PINCH_THRESHOLD) return false;
+  
+  // 2. Index finger must be curled
+  const indexCurled = indexTip.y > indexDIP.y && indexDIP.y > indexPIP.y;
+  if (!indexCurled) return false;
+  
+  return true;
 };
 
 export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
   
-  const wrist = landmarks[0];
+  const thumbCMC = landmarks[1];
+  const thumbMCP = landmarks[2];
+  const thumbIP = landmarks[3];
   const thumbTip = landmarks[4];
   const indexTip = landmarks[8];
   
   // Check if all required landmarks exist
-  if (!wrist || !thumbTip || !indexTip) {
+  if (!thumbCMC || !thumbMCP || !thumbIP || !thumbTip || !indexTip) {
     return false;
   }
   
   // 1. Thumb and index must be spread apart at sufficient angle
-  const thumbIndexAngle = calculateAngle(wrist, thumbTip, indexTip);
+  const thumbIndexAngle = calculateAngle(thumbMCP, thumbTip, indexTip);
+  console.log('thumbIndexAngle', thumbIndexAngle);
+
   if (thumbIndexAngle < VICTORY_ANGLE_THRESHOLD) return false;
   
   // 2. Middle, ring, and pinky fingers must be curled (strict)
@@ -149,10 +172,18 @@ export const calculateZoomSpeed = (landmarks: NormalizedLandmark[]) => {
   };
 };
 
-export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode => {
+export const detectControlMode = (landmarks: NormalizedLandmark[], categoryName: string): ControlMode => {
   if (!landmarks || landmarks.length === 0) return 'IDLE';
+
+  if (categoryName === 'Closed_Fist' || categoryName === 'Open_Palm') {
+    return 'IDLE';
+  }
+
+  if (categoryName === 'Pointing_Up') {
+    return 'PANNING';
+  }
   
-  if (isClosePinchGesture(landmarks)) {
+  if (isPinchGesture(landmarks)) {
     return 'ZOOM_OUT';
   }
   
@@ -167,22 +198,27 @@ export const detectControlMode = (landmarks: NormalizedLandmark[]): ControlMode 
   return 'IDLE';
 };
 
-export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult) => {
-  if (smoothedLandmarks.length === 0) {
-    return {
-      controlMode: 'IDLE' as ControlMode,
-      panVector: null,
-      zoomVector: null,
-    };
-  }
+const defaultGestureState = {
+  controlMode: 'IDLE' as ControlMode,
+  panVector: null,
+  zoomVector: null,
+}
 
-  const primaryHand = smoothedLandmarks[0];
-  const controlMode = detectControlMode(primaryHand);
+export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], results: GestureRecognizerResult) => {
+  if (smoothedLandmarks.length === 0) return defaultGestureState;
+
+  const categoryName = results.gestures[0][0].categoryName;
+  console.log('categoryName', categoryName);
+  const primaryHandLandmarks = smoothedLandmarks[0];
+
+  const controlMode = detectControlMode(primaryHandLandmarks, categoryName);
+
+  console.log('controlMode', controlMode);
   
   switch (controlMode) {
     case 'ZOOM_IN':
     case 'ZOOM_OUT':
-      const zoomSpeedInfo = calculateZoomSpeed(primaryHand);
+      const zoomSpeedInfo = calculateZoomSpeed(primaryHandLandmarks);
       const zoomVec = {
         direction: controlMode,
         ...zoomSpeedInfo
@@ -195,7 +231,7 @@ export const processGestureState = (smoothedLandmarks: NormalizedLandmark[][], r
       };
 
     case 'PANNING':
-      const panVec = calculatePanVector(primaryHand);
+      const panVec = calculatePanVector(primaryHandLandmarks);
       
       return {
         controlMode,
