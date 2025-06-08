@@ -3,14 +3,45 @@ import type { ControlMode } from '../types';
 import { DEAD_ZONE_CENTER, DEAD_ZONE_RADIUS, PAN_SPEED_AMPLIFIER, CLOSE_PINCH_THRESHOLD, THUMB_CURL_THRESHOLD, VICTORY_ANGLE_THRESHOLD } from '../constants';
 import { calculateDistance, calculateAngle } from './geometry';
 
+// Helper function to extract commonly used landmarks
+const extractLandmarks = (landmarks: NormalizedLandmark[]) => {
+  return {
+    wrist: landmarks[0],
+    thumbCMC: landmarks[1],
+    thumbMCP: landmarks[2],
+    thumbIP: landmarks[3],
+    thumbTip: landmarks[4],
+    indexMCP: landmarks[5],
+    indexPIP: landmarks[6],
+    indexDIP: landmarks[7],
+    indexTip: landmarks[8],
+    middleMCP: landmarks[9],
+    middlePIP: landmarks[10],
+    middleDIP: landmarks[11],
+    middleTip: landmarks[12],
+    ringMCP: landmarks[13],
+    ringPIP: landmarks[14],
+    ringDIP: landmarks[15],
+    ringTip: landmarks[16],
+    pinkyMCP: landmarks[17],
+    pinkyPIP: landmarks[18],
+    pinkyDIP: landmarks[19],
+    pinkyTip: landmarks[20],
+  };
+};
+
+// Helper function to calculate hand size (wrist to middle MCP distance)
+const calculateHalfHandSize = (landmarks: NormalizedLandmark[]): number => {
+  const { wrist, middleMCP } = extractLandmarks(landmarks);
+  
+  if (!wrist || !middleMCP) return 0;
+  
+  return calculateDistance(wrist, middleMCP);
+};
+
 // Helper function to check if middle, ring, and pinky fingers are curled
 const areFingersCurled = (landmarks: NormalizedLandmark[], tolerance: number = 0): boolean => {
-  const middleTip = landmarks[12];
-  const middlePIP = landmarks[10];
-  const ringTip = landmarks[16];
-  const ringPIP = landmarks[14];
-  const pinkyTip = landmarks[20];
-  const pinkyPIP = landmarks[18];
+  const { middleTip, middlePIP, ringTip, ringPIP, pinkyTip, pinkyPIP } = extractLandmarks(landmarks);
   
   if (!middleTip || !middlePIP || !ringTip || !ringPIP || !pinkyTip || !pinkyPIP) {
     return false;
@@ -28,11 +59,7 @@ export const isIndexPointingUp = (
 ): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
   
-  const thumbTip = landmarks[4];
-  const indexTip = landmarks[8];
-  const indexPIP = landmarks[6];
-  const indexMCP = landmarks[5];
-  const middlePIP = landmarks[10];
+  const { thumbTip, indexTip, indexPIP, indexMCP, middlePIP } = extractLandmarks(landmarks);
   
   // Check if all required landmarks exist
   if (!thumbTip || !indexTip || !indexPIP || !indexMCP || !middlePIP) {
@@ -59,18 +86,10 @@ export const isIndexPointingUp = (
 export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
   if (!landmarks || landmarks.length === 0) return false;
   
-  const wrist = landmarks[0];
-  const thumbTip = landmarks[4];
-  const thumbIP = landmarks[3];
-  const thumbMCP = landmarks[2];
-  const indexPIP = landmarks[6];
-  const indexDIP = landmarks[7];
-  const indexTip = landmarks[8];
-  const middleMCP = landmarks[9];
-  const middlePIP = landmarks[10];
+  const { thumbMCP, thumbIP, thumbTip, indexPIP, indexDIP, indexTip, middleMCP, middlePIP, ringTip, pinkyTip } = extractLandmarks(landmarks);
   
   // Check if all required landmarks exist
-  if (!thumbTip || !thumbIP || !thumbMCP || !indexTip || !indexPIP || !indexDIP || !middlePIP) {
+  if (!thumbTip || !thumbIP || !thumbMCP || !indexTip || !indexPIP || !indexDIP) {
     return false;
   }
   
@@ -83,11 +102,14 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   const indexCurled = indexTip.y > indexDIP.y && indexDIP.y > indexPIP.y;
   if (!indexCurled) return false;
 
-  // 3. thumb and index to middle finger distance related to the wist to middle finger distance
-  const wristMiddleDistance = calculateDistance(wrist, middleMCP);
+  // 3. thumb and index to middle finger distance related to the half hand size
+  const halfHandSize = calculateHalfHandSize(landmarks);
   const indexMiddleDistance = calculateDistance(indexTip, middleMCP);
-  const indexMiddleDistanceRatio = indexMiddleDistance / wristMiddleDistance;
+  const indexMiddleDistanceRatio = indexMiddleDistance / halfHandSize;
   if (indexMiddleDistanceRatio < 0.58) return false;
+
+  // 4. Middle, ring, pinky to distance related to wrist to middle finger distance
+  
   
   return true;
 };
@@ -95,11 +117,7 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
 export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!landmarks || landmarks.length === 0) return false;
   
-  const thumbCMC = landmarks[1];
-  const thumbMCP = landmarks[2];
-  const thumbIP = landmarks[3];
-  const thumbTip = landmarks[4];
-  const indexTip = landmarks[8];
+  const { thumbCMC, thumbMCP, thumbIP, thumbTip, indexTip } = extractLandmarks(landmarks);
   
   // Check if all required landmarks exist
   if (!thumbCMC || !thumbMCP || !thumbIP || !thumbTip || !indexTip) {
@@ -121,7 +139,7 @@ export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
 export const calculatePanVector = (landmarks: NormalizedLandmark[]) => {
   if (!landmarks || landmarks.length === 0) return { x: 0, y: 0, speed: 0, inDeadZone: true };
   
-  const indexTip = landmarks[8];
+  const { indexTip } = extractLandmarks(landmarks);
   if (!indexTip) return { x: 0, y: 0, speed: 0, inDeadZone: true };
   
   // Calculate vector from dead zone center to finger tip
@@ -157,7 +175,7 @@ export const calculateZoomSpeed = (landmarks: NormalizedLandmark[]) => {
   if (!landmarks || landmarks.length === 0) return { speed: 0, inDeadZone: true };
   
   // Use index finger tip position for zoom speed control (same as panning)
-  const indexTip = landmarks[8];
+  const { indexTip } = extractLandmarks(landmarks);
   if (!indexTip) return { speed: 0, inDeadZone: true };
   
   // Calculate distance from dead zone center
