@@ -84,19 +84,17 @@ function MagicControl() {
 
     // step 4: detect control mode with debouncing
     const detectedMode = getControlMode(smoothedLandmarks, results);
-    const debouncedMode = getDebouncedControlMode(
-      detectedMode,
-      currentControlMode,
-      controlModeHistoryRef,
-      DEBOUNCE_FRAMES
-    );
+    // const debouncedMode = getDebouncedControlMode(
+    //   detectedMode,
+    //   currentControlMode,
+    //   controlModeHistoryRef,
+    //   DEBOUNCE_FRAMES
+    // );
     
-    if (debouncedMode !== currentControlMode) {
-      setCurrentControlMode(debouncedMode);
-    }
+    setCurrentControlMode(detectedMode);
     
     // step 5: calculate gesture vectors using debounced mode
-    const gestureVectors = getGestureVectors(debouncedMode, smoothedLandmarks);
+    const gestureVectors = getGestureVectors(detectedMode, smoothedLandmarks);
     setPanVector(gestureVectors.panVector);
     setZoomVector(gestureVectors.zoomVector);    
     

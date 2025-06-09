@@ -54,6 +54,25 @@ const areFingersCurled = (landmarks: NormalizedLandmark[], tolerance: number = 0
   return middleCurled && ringCurled && pinkyCurled;
 };
 
+const areFingersClosed = (landmarks: NormalizedLandmark[]): boolean => {
+  const { thumbCMC, middleTip, ringTip, pinkyTip } = extractLandmarks(landmarks);
+  
+  if (!thumbCMC || !middleTip || !ringTip || !pinkyTip) {
+    return false;
+  }
+
+  const halfHandSize = calculateHalfHandSize(landmarks);
+  const middleTipThumbCMCDistance = calculateDistance(middleTip, thumbCMC);
+  const ringTipThumbCMCDistance = calculateDistance(ringTip, thumbCMC);
+  const pinkyTipThumbCMCDistance = calculateDistance(pinkyTip, thumbCMC);
+  const DISTANCE_RATIO = 0.5;
+  const middleClosed = middleTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
+  const ringClosed = ringTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
+  const pinkyClosed = pinkyTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
+
+  return middleClosed && ringClosed && pinkyClosed;
+};
+
 export const isIndexPointingUp = (
   landmarks: NormalizedLandmark[],
 ): boolean => {
@@ -79,6 +98,10 @@ export const isIndexPointingUp = (
   const fingersCurled = areFingersCurled(landmarks, 0.04);
   if (!fingersCurled) return false;
 
+  // 4. Middle, ring, pinky to distance related to wrist to middle finger distance
+  const fingersClosed = areFingersClosed(landmarks);
+  if (!fingersClosed) return false;
+
   return true;
 };
 
@@ -86,7 +109,7 @@ export const isIndexPointingUp = (
 export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {  
   if (!landmarks || landmarks.length === 0) return false;
   
-  const { thumbMCP, thumbIP, thumbTip, indexPIP, indexDIP, indexTip, middleMCP, middlePIP, ringTip, pinkyTip } = extractLandmarks(landmarks);
+  const { thumbMCP, thumbIP, thumbTip, indexPIP, indexDIP, indexTip, middleMCP } = extractLandmarks(landmarks);
   
   // Check if all required landmarks exist
   if (!thumbTip || !thumbIP || !thumbMCP || !indexTip || !indexPIP || !indexDIP) {
@@ -102,14 +125,15 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   const indexCurled = indexTip.y > indexDIP.y && indexDIP.y > indexPIP.y;
   if (!indexCurled) return false;
 
-  // 3. thumb and index to middle finger distance related to the half hand size
+  // 3. index to middle finger distance related to the half hand size
   const halfHandSize = calculateHalfHandSize(landmarks);
   const indexMiddleDistance = calculateDistance(indexTip, middleMCP);
   const indexMiddleDistanceRatio = indexMiddleDistance / halfHandSize;
   if (indexMiddleDistanceRatio < 0.58) return false;
 
   // 4. Middle, ring, pinky to distance related to wrist to middle finger distance
-  
+  const fingersClosed = areFingersClosed(landmarks);
+  if (!fingersClosed) return false;
   
   return true;
 };
@@ -132,6 +156,10 @@ export const isVictoryGesture = (landmarks: NormalizedLandmark[]): boolean => {
   // 2. Middle, ring, and pinky fingers must be curled (strict)
   const fingersCurled = areFingersCurled(landmarks);
   if (!fingersCurled) return false;
+
+  // 3. Middle, ring, pinky to distance related to wrist to middle finger distance
+  const fingersClosed = areFingersClosed(landmarks);
+  if (!fingersClosed) return false;
   
   return true;
 };
@@ -218,9 +246,9 @@ export const detectControlMode = (landmarks: NormalizedLandmark[], categoryName:
     return 'ZOOM_IN';
   }
 
-  if (isIndexPointingUp(landmarks)) {
-    return 'PANNING';
-  }
+  // if (isIndexPointingUp(landmarks)) {
+  //   return 'PANNING';
+  // }
   
   return 'IDLE';
 };
