@@ -65,7 +65,7 @@ const areFingersClosed = (landmarks: NormalizedLandmark[]): boolean => {
   const middleTipThumbCMCDistance = calculateDistance(middleTip, thumbCMC);
   const ringTipThumbCMCDistance = calculateDistance(ringTip, thumbCMC);
   const pinkyTipThumbCMCDistance = calculateDistance(pinkyTip, thumbCMC);
-  const DISTANCE_RATIO = 0.6;
+  const DISTANCE_RATIO = 0.8;
   const middleClosed = middleTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
   const ringClosed = ringTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
   const pinkyClosed = pinkyTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
@@ -115,6 +115,8 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!thumbTip || !thumbIP || !thumbMCP || !indexTip || !indexPIP || !indexDIP) {
     return false;
   }
+
+  const halfHandSize = calculateHalfHandSize(landmarks);
   
   // 1. Thumb and index tips must be close together
   const thumbIndexDistance = calculateDistance(thumbTip, indexTip);
@@ -126,7 +128,6 @@ export const isPinchGesture = (landmarks: NormalizedLandmark[]): boolean => {
   if (!indexCurled) return false;
 
   // 3. index to middle finger distance related to the half hand size
-  const halfHandSize = calculateHalfHandSize(landmarks);
   const indexMiddleDistance = calculateDistance(indexTip, middleMCP);
   const indexMiddleDistanceRatio = indexMiddleDistance / halfHandSize;
   if (indexMiddleDistanceRatio < 0.58) return false;
