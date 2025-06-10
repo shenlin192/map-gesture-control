@@ -65,7 +65,7 @@ const areFingersClosed = (landmarks: NormalizedLandmark[]): boolean => {
   const middleTipThumbCMCDistance = calculateDistance(middleTip, thumbCMC);
   const ringTipThumbCMCDistance = calculateDistance(ringTip, thumbCMC);
   const pinkyTipThumbCMCDistance = calculateDistance(pinkyTip, thumbCMC);
-  const DISTANCE_RATIO = 0.5;
+  const DISTANCE_RATIO = 0.6;
   const middleClosed = middleTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
   const ringClosed = ringTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
   const pinkyClosed = pinkyTipThumbCMCDistance < halfHandSize * DISTANCE_RATIO;
@@ -246,9 +246,9 @@ export const detectControlMode = (landmarks: NormalizedLandmark[], categoryName:
     return 'ZOOM_IN';
   }
 
-  // if (isIndexPointingUp(landmarks)) {
-  //   return 'PANNING';
-  // }
+  if (isIndexPointingUp(landmarks)) {
+    return 'PANNING';
+  }
   
   return 'IDLE';
 };
