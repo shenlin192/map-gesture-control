@@ -1,1 +1,6 @@
-export type ControlMode = 'PANNING' | 'ZOOM_IN' | 'ZOOM_OUT' | 'IDLE';
+export type ControlMode =
+  | 'PANNING'
+  | 'ZOOM_IN'
+  | 'ZOOM_OUT'
+  | 'IDLE'
+  | 'FIREWORKS';

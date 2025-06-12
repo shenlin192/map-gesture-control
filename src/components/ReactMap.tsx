@@ -10,10 +10,7 @@ type Props = {
 
 function ReactMap({ mapRef, containerRef, onMapLoad }: Props) {
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full rounded-lg shadow-xl border-2 border-blue-500 bg-gray-700 relative overflow-hidden"
-    >
+    <div ref={containerRef} className="w-full h-full ">
       <Map
         ref={mapRef}
         onLoad={onMapLoad}
