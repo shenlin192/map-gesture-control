@@ -25,7 +25,7 @@ export default function PanVectorInfo({ panVector }: PanVectorInfoProps) {
 
   return (
     <div className="bg-gray-600 p-3 rounded text-sm w-80">
-      <div className="font-semibold text-blue-300 mb-2">Pan Vector Info (Natural Scrolling):</div>
+      <div className="font-semibold text-blue-300 mb-2">Pan Vector Info :</div>
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
         <div>
           <span className="text-gray-300">Hand Direction:</span>

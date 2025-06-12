@@ -17,7 +17,7 @@ function ReactMap({ mapRef, containerRef, onMapLoad }: Props) {
         initialViewState={{
           longitude: 2.3333333,
           latitude: 48.866667,
-          zoom: 12,
+          zoom: 11,
           pitch: 30,
         }}
         mapboxAccessToken={import.meta.env.VITE_MAPBOX_ACCESS_TOKEN}
