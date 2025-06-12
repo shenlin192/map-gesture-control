@@ -12,14 +12,22 @@ const formatSpeedPercentage = (speed: number): string => {
 };
 
 // Helper function to generate gesture text based on control mode and state
-const generateGestureText = (controlMode: ControlMode, panVector: any, zoomVector: any): string => {
+const generateGestureText = (
+  controlMode: ControlMode,
+  panVector: any,
+  zoomVector: any,
+): string => {
   if (controlMode === 'IDLE') {
     return 'Idle';
   }
 
+  if (controlMode === 'FIREWORKS') {
+    return 'Enjoy the fireworks!';
+  }
+
   if (controlMode === 'ZOOM_IN' || controlMode === 'ZOOM_OUT') {
     if (!zoomVector) return 'Unknown';
-    
+
     const gestureLabel = controlMode === 'ZOOM_IN' ? 'Victory' : 'Close Pinch';
     if (zoomVector.inDeadZone) {
       return `${gestureLabel} - In Dead Zone`;
@@ -30,7 +38,7 @@ const generateGestureText = (controlMode: ControlMode, panVector: any, zoomVecto
 
   if (controlMode === 'PANNING') {
     if (!panVector) return 'Unknown';
-    
+
     if (panVector.inDeadZone) {
       return 'Pointing Up - In Dead Zone';
     }
@@ -40,19 +48,32 @@ const generateGestureText = (controlMode: ControlMode, panVector: any, zoomVecto
   return 'Unknown';
 };
 
-export default function ControlStatus({ currentControlMode, panVector, zoomVector }: ControlStatusProps) {
-  const detectedGesture = generateGestureText(currentControlMode, panVector, zoomVector);
+export default function ControlStatus({
+  currentControlMode,
+  panVector,
+  zoomVector,
+}: ControlStatusProps) {
+  const detectedGesture = generateGestureText(
+    currentControlMode,
+    panVector,
+    zoomVector,
+  );
   return (
     <div className="mb-4 p-4 bg-gray-700 rounded-lg">
       <div className="flex flex-col gap-3">
         <div className="flex gap-6">
           <div>
             <span className="font-semibold">Control Mode: </span>
-            <span className={`px-2 py-1 rounded text-sm ${
-              currentControlMode === 'PANNING' ? 'bg-blue-600' :
-              currentControlMode === 'ZOOM_IN' || currentControlMode === 'ZOOM_OUT' ? 'bg-green-600' :
-              'bg-gray-600'
-            }`}>
+            <span
+              className={`px-2 py-1 rounded text-sm ${
+                currentControlMode === 'PANNING'
+                  ? 'bg-blue-600'
+                  : currentControlMode === 'ZOOM_IN' ||
+                      currentControlMode === 'ZOOM_OUT'
+                    ? 'bg-green-600'
+                    : 'bg-gray-600'
+              }`}
+            >
               {currentControlMode}
             </span>
           </div>
